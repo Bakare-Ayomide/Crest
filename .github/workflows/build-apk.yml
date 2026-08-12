@@ -38,7 +38,8 @@ jobs:
 
       - name: Add & Sync Capacitor Android Platform
         run: |
-          npx cap add android || true
+          rm -rf android
+          npx cap add android
           npx cap sync android
 
       - name: Build Android Debug APK with Gradle
