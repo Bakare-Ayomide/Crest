@@ -36,10 +36,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Add & Sync Capacitor Android Platform
         run: |
           rm -rf android
           npx cap add android
+          sed -i 's/-all.zip/-bin.zip/g' android/gradle/wrapper/gradle-wrapper.properties
           npx cap sync android
 
       - name: Build Android Debug APK with Gradle
