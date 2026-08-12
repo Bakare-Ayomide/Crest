@@ -1,0 +1,6 @@
+{
+  "name": "CREST - Native Dating & Social Discovery",
+  "description": "Full-featured modern dating application and Capacitor native experience with swipe cards, AI match analysis, instant chat, subscriptions, photo galleries, pose verification, and admin controls.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
