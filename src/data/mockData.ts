@@ -93,7 +93,12 @@ export const MOCK_PROFILES: UserProfile[] = [
       pets: 'Dog lover 🐶',
       drinking: 'Socially 🍸',
       workout: 'Pilates & Swimming 🧘‍♀️',
-      smoking: 'Never 🚭'
+      smoking: 'Never 🚭',
+      languages: ['English 🇬🇧', 'French 🇫🇷', 'Yoruba 🇳🇬'],
+      communicationStyle: 'Big texter 💬',
+      wantChildren: 'Want children 👶',
+      childrenCount: 'None',
+      lookingForGender: 'Men 👨'
     },
     lookingFor: 'Long-term relationship',
     spotifyTrack: {
@@ -170,8 +175,15 @@ export const MOCK_PROFILES: UserProfile[] = [
     height: '5\'7"',
     zodiac: 'Gemini ♊',
     lifestyle: {
+      pets: 'Cat person 🐱',
       workout: 'Pilates & Yoga 🧘‍♀️',
-      drinking: 'Socially 🍹'
+      drinking: 'Socially 🍹',
+      smoking: 'Never 🚭',
+      languages: ['English 🇬🇧', 'Yoruba 🇳🇬'],
+      communicationStyle: 'In-person calls 📞',
+      wantChildren: 'Open to children 👶',
+      childrenCount: 'None',
+      lookingForGender: 'Men 👨'
     },
     lookingFor: 'Long-term relationship',
     compatibilityScore: 94,
@@ -207,7 +219,14 @@ export const MOCK_PROFILES: UserProfile[] = [
     zodiac: 'Sagittarius ♐',
     lifestyle: {
       pets: 'Love dogs 🐶',
-      workout: 'Outdoor Trails & Swimming 🏊‍♀️'
+      drinking: 'Socially 🍷',
+      smoking: 'Never 🚭',
+      workout: 'Outdoor Trails & Swimming 🏊‍♀️',
+      languages: ['English 🇬🇧', 'Spanish 🇪🇸', 'Yoruba 🇳🇬'],
+      communicationStyle: 'Video calls & texts 💬',
+      wantChildren: 'Want children 👶',
+      childrenCount: 'None',
+      lookingForGender: 'Men 👨'
     },
     lookingFor: 'Long-term relationship',
     compatibilityScore: 92,

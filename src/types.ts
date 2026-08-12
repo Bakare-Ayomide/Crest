@@ -28,6 +28,11 @@ export interface UserProfile {
     smoking?: string;
     workout?: string;
     diet?: string;
+    languages?: string[];
+    communicationStyle?: string;
+    wantChildren?: string;
+    childrenCount?: string;
+    lookingForGender?: string;
   };
   lookingFor: 'Long-term relationship' | 'Short-term fun' | 'New friends' | 'Still figuring it out';
   spotifyTrack?: {

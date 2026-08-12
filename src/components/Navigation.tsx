@@ -39,11 +39,8 @@ export const Header: React.FC<NavigationProps> = ({
           onClick={() => { triggerHaptic('light'); setActiveTab('discover'); }}
           className="flex items-center gap-2 cursor-pointer group"
         >
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-rose-500 via-pink-500 to-amber-400 flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:scale-105 transition-transform">
-            <Flame className="w-5 h-5 fill-white" />
-          </div>
           <div>
-            <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 bg-clip-text text-transparent">
+            <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 bg-clip-text text-transparent font-sans">
               CREST
             </span>
             {isGold && (
@@ -65,18 +62,6 @@ export const Header: React.FC<NavigationProps> = ({
               <span>Get Gold</span>
             </button>
           )}
-
-          <button
-            onClick={() => { triggerHaptic('light'); setIsNativeDeviceFrame(prev => !prev); }}
-            title="Toggle Device Frame"
-            className={`p-2 rounded-xl transition-colors ${
-              isNativeDeviceFrame 
-                ? 'bg-rose-950/60 text-rose-400 border border-rose-800/40' 
-                : 'text-gray-400 hover:bg-white/10'
-            }`}
-          >
-            <Smartphone className="w-5 h-5" />
-          </button>
 
           <button
             onClick={() => { triggerHaptic('light'); onOpenFilters(); }}
