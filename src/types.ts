@@ -48,28 +48,100 @@ export interface UserProfile {
 
 export type SwipeDirection = 'left' | 'right' | 'up' | 'down';
 
+export interface MessageReaction {
+  emoji: string;
+  userIds: string[];
+}
+
+export interface ReplyReference {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  mediaType?: 'image' | 'audio' | 'video' | 'file' | 'date_invite';
+  mediaUrl?: string;
+}
+
+export interface DateInviteData {
+  title: string;
+  vibe: string;
+  location: string;
+  activity: string;
+  status: 'pending' | 'accepted' | 'declined';
+  proposedBy?: string;
+}
+
+export interface CallEventData {
+  type: 'voice' | 'video';
+  direction?: 'incoming' | 'outgoing' | 'missed';
+  durationSeconds?: number;
+  status: 'completed' | 'missed' | 'declined' | 'cancelled';
+}
+
 export interface Message {
   id: string;
   matchId: string;
-  senderId: string; // 'user' or match user id
+  senderId: string; // 'user_me' or match user id
+  senderName?: string;
   text: string;
   timestamp: string;
+  createdAt?: number;
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  isEdited?: boolean;
+  editedAt?: string;
+  editTimestamp?: string;
+  deletedForMe?: boolean;
+  deletedForEveryone?: boolean;
   isImage?: boolean;
   imageUrl?: string;
+  imageCaption?: string;
   isAudio?: boolean;
+  audioUrl?: string;
   audioDuration?: string;
+  audioWaveform?: number[];
+  isVideo?: boolean;
+  videoUrl?: string;
+  videoThumbnail?: string;
+  videoDuration?: string;
+  isFile?: boolean;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
+  fileMimeType?: string;
   isGif?: boolean;
   gifUrl?: string;
-  status: 'sent' | 'delivered' | 'read';
+  isDateInvite?: boolean;
+  dateInvite?: DateInviteData;
+  isCallEvent?: boolean;
+  callEvent?: CallEventData;
+  replyTo?: ReplyReference;
+  reactions?: MessageReaction[];
+  pinned?: boolean;
+  starred?: boolean;
+  urlPreview?: {
+    url: string;
+    title: string;
+    description: string;
+    image?: string;
+    domain: string;
+  };
 }
 
 export interface Match {
   id: string;
   user: UserProfile;
   matchedAt: string;
-  lastMessage?: Message;
+  lastMessage?: Message | string;
+  lastMessageTime?: string;
   unreadCount: number;
   onlineStatus: 'online' | 'offline' | 'away';
+  lastSeen?: string;
+  isTyping?: boolean;
+  isPinned?: boolean;
+  isMuted?: boolean;
+  isArchived?: boolean;
+  isBlocked?: boolean;
+  draftText?: string;
 }
 
 export interface NotificationItem {

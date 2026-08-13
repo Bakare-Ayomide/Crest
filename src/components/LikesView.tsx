@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Heart, Sparkles, Lock, Star, MessageCircle, Flame, Clock } from 'lucide-react';
 import { UserProfile } from '../types';
 import { triggerHaptic } from '../lib/capacitor';
+import { CanonicalProfileView } from './CanonicalProfileView';
 
 interface LikesViewProps {
   likedYouProfiles: UserProfile[];
@@ -10,6 +11,7 @@ interface LikesViewProps {
   onOpenSubscription: () => void;
   onMatchUser: (profile: UserProfile) => void;
   onSuperLikeUser: (profile: UserProfile) => void;
+  onReportProfile?: (profile: UserProfile) => void;
 }
 
 export const LikesView: React.FC<LikesViewProps> = ({
@@ -18,9 +20,11 @@ export const LikesView: React.FC<LikesViewProps> = ({
   isGold,
   onOpenSubscription,
   onMatchUser,
-  onSuperLikeUser
+  onSuperLikeUser,
+  onReportProfile
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'likedYou' | 'topPicks'>('likedYou');
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
 
   return (
     <div className="flex-1 max-w-md mx-auto w-full px-4 pt-3 pb-24">
@@ -84,7 +88,16 @@ export const LikesView: React.FC<LikesViewProps> = ({
             {likedYouProfiles.map((profile) => (
               <div
                 key={profile.id}
-                className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-gray-200 dark:bg-gray-800 shadow-sm group border border-gray-100 dark:border-gray-800"
+                onClick={() => {
+                  if (isGold) {
+                    triggerHaptic('light');
+                    setSelectedProfile(profile);
+                  } else {
+                    triggerHaptic('medium');
+                    onOpenSubscription();
+                  }
+                }}
+                className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-gray-200 dark:bg-gray-800 shadow-sm group border border-gray-100 dark:border-gray-800 cursor-pointer"
               >
                 <img
                   src={profile.photos[0]}
@@ -123,7 +136,11 @@ export const LikesView: React.FC<LikesViewProps> = ({
                       <p className="text-[11px] text-gray-300">{profile.distanceKm} km away</p>
                       
                       <button
-                        onClick={() => { triggerHaptic('success'); onMatchUser(profile); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerHaptic('success');
+                          onMatchUser(profile);
+                        }}
                         className="mt-2 w-full py-1.5 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1 hover:scale-102 transition-transform"
                       >
                         <Heart className="w-3.5 h-3.5 fill-white" />
@@ -153,7 +170,11 @@ export const LikesView: React.FC<LikesViewProps> = ({
             {topPicksProfiles.map((profile) => (
               <div
                 key={profile.id}
-                className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-gray-900 shadow-md group border border-gray-100 dark:border-gray-800"
+                onClick={() => {
+                  triggerHaptic('light');
+                  setSelectedProfile(profile);
+                }}
+                className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-gray-900 shadow-md group border border-gray-100 dark:border-gray-800 cursor-pointer"
               >
                 <img
                   src={profile.photos[0]}
@@ -175,7 +196,11 @@ export const LikesView: React.FC<LikesViewProps> = ({
                   <p className="text-[11px] text-gray-300 line-clamp-1">{profile.interests.slice(0, 2).join(' • ')}</p>
 
                   <button
-                    onClick={() => { triggerHaptic('heavy'); onSuperLikeUser(profile); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerHaptic('heavy');
+                      onSuperLikeUser(profile);
+                    }}
                     className="mt-2 w-full py-1.5 bg-gradient-to-r from-sky-500 to-indigo-500 text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-1 hover:scale-102 transition-transform"
                   >
                     <Star className="w-3.5 h-3.5 fill-white" />
@@ -186,6 +211,29 @@ export const LikesView: React.FC<LikesViewProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {/* CANONICAL PROFILE VIEW DRAWER */}
+      {selectedProfile && (
+        <CanonicalProfileView
+          user={selectedProfile}
+          isDrawer={true}
+          isOwnProfile={false}
+          isMatched={false}
+          onClose={() => setSelectedProfile(null)}
+          onLike={(u) => {
+            onMatchUser(u);
+            setSelectedProfile(null);
+          }}
+          onSuperLike={(u) => {
+            onSuperLikeUser(u);
+            setSelectedProfile(null);
+          }}
+          onReport={(u) => {
+            if (onReportProfile) onReportProfile(u);
+            setSelectedProfile(null);
+          }}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/re
 import { Heart, X, MapPin, ChevronLeft, MoreHorizontal, Info, Sparkles, RotateCcw, Zap } from 'lucide-react';
 import { UserProfile, SwipeDirection } from '../types';
 import { triggerHaptic } from '../lib/capacitor';
+import { CanonicalProfileView } from './CanonicalProfileView';
 
 interface DiscoverSwipeProps {
   profiles: UserProfile[];
@@ -274,139 +275,33 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
         </div>
       </div>
 
-      {/* DETAIL BIO MODAL */}
+      {/* CANONICAL PROFILE VIEW MODAL */}
       {selectedProfileModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end justify-center p-0 sm:p-4">
-          <div className="bg-[#171819] w-full max-w-md h-[85vh] rounded-t-3xl sm:rounded-3xl p-5 overflow-y-auto text-white space-y-4 relative border border-white/10">
-            <button
-              onClick={() => setSelectedProfileModal(null)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black/90 z-10"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="relative w-full aspect-square rounded-2xl overflow-hidden mt-2">
-              <img src={selectedProfileModal.photos[0]} alt="" className="w-full h-full object-cover" />
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div>
-                <h3 className="text-2xl font-bold flex items-center gap-2">
-                  {selectedProfileModal.name}, {selectedProfileModal.age}
-                  {selectedProfileModal.verified && (
-                    <span className="w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs">✓</span>
-                  )}
-                </h3>
-                <p className="text-xs text-[#E98BD0] font-semibold mt-0.5 flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {Math.round((selectedProfileModal.distanceKm || 2) * 0.621371)} miles away • {selectedProfileModal.locationName}
-                </p>
-              </div>
-
-              {/* Work & Education */}
-              {(selectedProfileModal.jobTitle || selectedProfileModal.education) && (
-                <div className="p-3 rounded-xl bg-white/5 space-y-1 text-xs">
-                  {selectedProfileModal.jobTitle && (
-                    <p className="font-medium text-gray-200">💼 {selectedProfileModal.jobTitle} {selectedProfileModal.company ? `at ${selectedProfileModal.company}` : ''}</p>
-                  )}
-                  {selectedProfileModal.education && (
-                    <p className="text-gray-400">🎓 {selectedProfileModal.education}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Bio */}
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Bio</h4>
-                <p className="text-xs text-gray-200 leading-relaxed bg-white/5 p-3 rounded-xl">{selectedProfileModal.bio}</p>
-              </div>
-
-              {/* Relationship Goals & Gender Seeking */}
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Looking For</h4>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-xs text-rose-300 font-semibold">
-                    🎯 Goal: {selectedProfileModal.lookingFor}
-                  </span>
-                  <span className="px-3 py-1.5 rounded-xl bg-purple-500/20 border border-purple-500/40 text-xs text-purple-300 font-semibold">
-                    👀 Seeking: {selectedProfileModal.lifestyle?.lookingForGender || 'Men'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Languages */}
-              {selectedProfileModal.lifestyle?.languages && (
-                <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Languages</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedProfileModal.lifestyle.languages.map((lang, idx) => (
-                      <span key={idx} className="px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-xs text-blue-200">
-                        🗣️ {lang}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Family & Children Details */}
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Family & Kids</h4>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 font-medium">
-                    👶 {selectedProfileModal.lifestyle?.wantChildren || 'Want children'}
-                  </span>
-                  <span className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 font-medium">
-                    🍼 Given Birth To: {selectedProfileModal.lifestyle?.childrenCount || 'None'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Communication & Lifestyle Badges */}
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Lifestyle & Vibes</h4>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {selectedProfileModal.lifestyle?.communicationStyle && (
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
-                      💬 Style: {selectedProfileModal.lifestyle.communicationStyle}
-                    </span>
-                  )}
-                  {selectedProfileModal.lifestyle?.drinking && (
-                    <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-gray-200">
-                      🍸 Drinking: {selectedProfileModal.lifestyle.drinking}
-                    </span>
-                  )}
-                  {selectedProfileModal.lifestyle?.smoking && (
-                    <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-gray-200">
-                      🚭 Smoking: {selectedProfileModal.lifestyle.smoking}
-                    </span>
-                  )}
-                  {selectedProfileModal.zodiac && (
-                    <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-gray-200">
-                      ✨ Zodiac: {selectedProfileModal.zodiac}
-                    </span>
-                  )}
-                  {selectedProfileModal.height && (
-                    <span className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-gray-200">
-                      📏 Height: {selectedProfileModal.height}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Passions / Interests */}
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Interests</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedProfileModal.interests.map((interest, i) => (
-                    <span key={i} className="px-2.5 py-1 rounded-full bg-white/10 text-xs text-gray-200">
-                      {interest}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CanonicalProfileView
+          user={selectedProfileModal}
+          isDrawer={true}
+          isOwnProfile={false}
+          isMatched={false}
+          onClose={() => setSelectedProfileModal(null)}
+          onLike={(u) => {
+            triggerSwipe('right');
+            setSelectedProfileModal(null);
+          }}
+          onSuperLike={(u) => {
+            triggerHaptic('medium');
+            onSwipe(u, 'up');
+            setCurrentIndex((prev) => prev + 1);
+            setSelectedProfileModal(null);
+          }}
+          onPass={(u) => {
+            triggerSwipe('left');
+            setSelectedProfileModal(null);
+          }}
+          onReport={(u) => {
+            onReportProfile(u);
+            setSelectedProfileModal(null);
+          }}
+        />
       )}
     </div>
   );

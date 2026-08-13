@@ -13,6 +13,7 @@ import { SettingsView } from './components/SettingsView';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { DeviceFrame } from './components/DeviceFrame';
+import { CanonicalProfileView } from './components/CanonicalProfileView';
 import { triggerHaptic, showNativeToast } from './lib/capacitor';
 import { Heart, MessageCircle, Sparkles, X, Send } from 'lucide-react';
 
@@ -63,6 +64,7 @@ export default function App() {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showVerificationWizard, setShowVerificationWizard] = useState(false);
   const [showSettingsView, setShowSettingsView] = useState(false);
+  const [globalViewProfile, setGlobalViewProfile] = useState<UserProfile | null>(null);
   const [isAdmin, setIsAdmin] = useState(true);
 
   // Apply dark mode class to html document
@@ -397,11 +399,74 @@ export default function App() {
             onClose={() => setShowNotificationsModal(false)}
             onSelectNotification={(item) => {
               setShowNotificationsModal(false);
+              const relatedProfile = profiles.find(p => p.id === item.userId || p.name === item.userName) ||
+                                     matches.find(m => m.user.id === item.userId || m.user.name === item.userName)?.user;
+              if (relatedProfile) {
+                setGlobalViewProfile(relatedProfile);
+                return;
+              }
               if (item.type === 'match' || item.type === 'message') {
                 setActiveTab('matches');
               } else if (item.type === 'superlike' || item.type === 'like') {
                 setActiveTab('likes');
               }
+            }}
+          />
+        )}
+
+        {/* GLOBAL PROFILE DRAWER (Opens when clicking profile from any view, notifications, or search) */}
+        {globalViewProfile && (
+          <CanonicalProfileView
+            user={globalViewProfile}
+            isDrawer={true}
+            isOwnProfile={globalViewProfile.id === currentUser.id}
+            isMatched={matches.some(m => m.user.id === globalViewProfile.id)}
+            onClose={() => setGlobalViewProfile(null)}
+            onLike={(u) => {
+              handleSwipe(u, 'right');
+              setGlobalViewProfile(null);
+            }}
+            onSuperLike={(u) => {
+              handleSwipe(u, 'up');
+              setGlobalViewProfile(null);
+            }}
+            onPass={(u) => {
+              handleSwipe(u, 'left');
+              setGlobalViewProfile(null);
+            }}
+            onOpenDateIdeas={(u) => {
+              setGlobalViewProfile(null);
+              const match = matches.find(m => m.user.id === u.id);
+              if (match) {
+                setActiveMatch(match);
+                setActiveTab('matches');
+              }
+            }}
+            onSendMessage={(u) => {
+              setGlobalViewProfile(null);
+              const match = matches.find(m => m.user.id === u.id);
+              if (match) {
+                setActiveMatch(match);
+                setActiveTab('matches');
+              }
+            }}
+            onReport={(u) => {
+              handleReportProfile(u);
+              setGlobalViewProfile(null);
+            }}
+            userSettings={userSettings}
+            onUpdateUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
+            onOpenSettings={() => {
+              setGlobalViewProfile(null);
+              setShowSettingsView(true);
+            }}
+            onOpenSubscription={() => {
+              setGlobalViewProfile(null);
+              setShowSubscriptionModal(true);
+            }}
+            onStartVerification={() => {
+              setGlobalViewProfile(null);
+              setShowVerificationWizard(true);
             }}
           />
         )}

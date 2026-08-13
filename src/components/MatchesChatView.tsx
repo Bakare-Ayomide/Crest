@@ -1,524 +1,858 @@
-import React, { useState } from 'react';
-import { Search, Send, Image, Mic, Sparkles, Phone, Video, ChevronLeft, CheckCheck, MapPin, Smile, X, Play, Pause, Compass, ShieldAlert } from 'lucide-react';
-import { Match, Message, UserProfile } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Match, Message, UserProfile, DateInviteData } from '../types';
+import { ConversationList } from './chat/ConversationList';
+import { ChatHeader } from './chat/ChatHeader';
+import { ChatSearch } from './chat/ChatSearch';
+import { MessageBubble } from './chat/MessageBubble';
+import { ChatComposer } from './chat/ChatComposer';
+import { MediaLightbox } from './chat/MediaLightbox';
+import { ActiveCallModal } from './chat/ActiveCallModal';
+import { UserProfileDrawer } from './chat/UserProfileDrawer';
+import { DateIdeasModal } from './chat/DateIdeasModal';
+import { BlockConfirmModal, UnmatchConfirmModal, ReportModal } from './chat/SafetyModals';
+import { ForwardModal } from './chat/ForwardModal';
 import { triggerHaptic, showNativeToast } from '../lib/capacitor';
+import { ArrowDown, Sparkles, ShieldCheck } from 'lucide-react';
 
 interface MatchesChatViewProps {
   matches: Match[];
   activeMatch: Match | null;
   setActiveMatch: (match: Match | null) => void;
-  onSendMessage: (matchId: string, text: string, media?: { isImage?: boolean; imageUrl?: string; isAudio?: boolean; audioUrl?: string; isGif?: boolean; gifUrl?: string }) => void;
+  onSendMessage?: (matchId: string, text: string, media?: any) => void;
   onReportProfile: (profile: UserProfile) => void;
 }
 
 export const MatchesChatView: React.FC<MatchesChatViewProps> = ({
-  matches,
+  matches: initialMatches,
   activeMatch,
   setActiveMatch,
-  onSendMessage,
   onReportProfile
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [inputText, setInputText] = useState('');
-  const [showAiWingman, setShowAiWingman] = useState(false);
-  const [aiStarters, setAiStarters] = useState<string[]>([]);
-  const [loadingStarters, setLoadingStarters] = useState(false);
-  
-  const [showDateSpotModal, setShowDateSpotModal] = useState(false);
-  const [dateSpots, setDateSpots] = useState<any[]>([]);
-  const [loadingDateSpots, setLoadingDateSpots] = useState(false);
+  const [matches, setMatches] = useState<Match[]>(initialMatches);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  const [activeCallModal, setActiveCallModal] = useState<'audio' | 'video' | null>(null);
-  const [isPlayingAudioId, setIsPlayingAudioId] = useState<string | null>(null);
+  // Replying state
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
-  // Fetch AI Icebreaker starters
-  const handleFetchIcebreakers = async () => {
-    if (!activeMatch) return;
-    setLoadingStarters(true);
-    setShowAiWingman(true);
-    triggerHaptic('light');
+  // In-chat search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatchesIndexes, setSearchMatchesIndexes] = useState<number[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
 
-    try {
-      const res = await fetch('/api/ai/icebreaker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          matchName: activeMatch.user.name,
-          matchInterests: activeMatch.user.interests,
-          bio: activeMatch.user.bio
-        })
-      });
-      const data = await res.json();
-      setAiStarters(data.starters || []);
-    } catch (e) {
-      setAiStarters([
-        `Hey ${activeMatch.user.name}! What's the best weekend spot in SF?`,
-        `Your photo in ${activeMatch.user.locationName} looks incredible! When was that taken?`
-      ]);
-    } finally {
-      setLoadingStarters(false);
+  // Modals & Drawers state
+  const [lightboxMedia, setLightboxMedia] = useState<{ url: string; type: 'image' | 'video'; caption?: string } | null>(null);
+  const [activeCall, setActiveCall] = useState<{ type: 'voice' | 'video'; isIncoming?: boolean } | null>(null);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [showDateIdeasModal, setShowDateIdeasModal] = useState(false);
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showUnmatchModal, setShowUnmatchModal] = useState(false);
+  const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+
+  // Scroll & UX state
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Synchronize matches with parent updates
+  useEffect(() => {
+    setMatches(initialMatches);
+  }, [initialMatches]);
+
+  // Load messages whenever activeMatch changes
+  useEffect(() => {
+    if (!activeMatch) {
+      setMessages([]);
+      return;
     }
-  };
 
-  // Fetch AI Date Spot Suggestions
-  const handleFetchDateSpots = async () => {
-    if (!activeMatch) return;
-    setLoadingDateSpots(true);
-    setShowDateSpotModal(true);
-    triggerHaptic('light');
+    let isMounted = true;
+    setIsLoadingMessages(true);
 
-    try {
-      const res = await fetch('/api/ai/datespot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          city: activeMatch.user.locationName,
-          vibe: 'cozy and stylish'
-        })
-      });
-      const data = await res.json();
-      setDateSpots(data.suggestions || []);
-    } catch (e) {
-      setDateSpots([
-        { name: "Artisanal Coffee & Coastal Walk", vibe: "Casual & Fresh", activity: "Stroll & Conversation" },
-        { name: "Speakeasy Cocktail Bar", vibe: "Ambient & Romantic", activity: "Craft Drinks" }
-      ]);
-    } finally {
-      setLoadingDateSpots(false);
+    async function fetchMessages() {
+      try {
+        const res = await fetch(`/api/chat/${activeMatch!.id}/messages`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setMessages(data.messages || []);
+          }
+        } else {
+          // Fallback initial messages from match
+          if (isMounted) {
+            const fallback: Message[] = [];
+            if (activeMatch!.lastMessage) {
+              if (typeof activeMatch!.lastMessage === 'string') {
+                fallback.push({
+                  id: `msg_init_1`,
+                  matchId: activeMatch!.id,
+                  senderId: activeMatch!.user.id,
+                  senderName: activeMatch!.user.name,
+                  text: activeMatch!.lastMessage,
+                  timestamp: activeMatch!.lastMessageTime || '10:24 AM',
+                  status: 'read'
+                });
+              } else {
+                fallback.push(activeMatch!.lastMessage);
+              }
+            }
+            setMessages(fallback);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch server messages, using local state:', err);
+      } finally {
+        if (isMounted) setIsLoadingMessages(false);
+      }
     }
-  };
 
-  const handleSend = () => {
-    if (!inputText.trim() || !activeMatch) return;
-    triggerHaptic('light');
-    onSendMessage(activeMatch.id, inputText.trim());
-    setInputText('');
-  };
+    fetchMessages();
 
-  const handleSendImage = () => {
-    if (!activeMatch) return;
-    triggerHaptic('medium');
-    const sampleImages = [
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80'
-    ];
-    const img = sampleImages[Math.floor(Math.random() * sampleImages.length)];
-    onSendMessage(activeMatch.id, '📷 Sent a photo', { isImage: true, imageUrl: img });
-    showNativeToast('Photo sent');
-  };
+    // Mark match as read
+    setMatches(prev => prev.map(m => m.id === activeMatch.id ? { ...m, unreadCount: 0 } : m));
 
-  const handleSendVoiceNote = () => {
-    if (!activeMatch) return;
-    triggerHaptic('medium');
-    onSendMessage(activeMatch.id, '🎤 Voice Note (0:14)', {
-      isAudio: true,
-      audioUrl: 'mock_audio',
-      audioDuration: '0:14'
+    return () => {
+      isMounted = false;
+    };
+  }, [activeMatch?.id]);
+
+  // Auto-scroll to bottom on messages change
+  useEffect(() => {
+    if (!showSearch) {
+      scrollToBottom();
+    }
+  }, [messages.length]);
+
+  // In-Chat Search indexing
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchMatchesIndexes([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+
+    const indices: number[] = [];
+    messages.forEach((msg, idx) => {
+      if (msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase())) {
+        indices.push(idx);
+      }
     });
-    showNativeToast('Voice note recorded & sent!');
+
+    setSearchMatchesIndexes(indices);
+    setCurrentSearchIndex(0);
+
+    if (indices.length > 0) {
+      const targetId = messages[indices[0]].id;
+      scrollToMessageId(targetId);
+    }
+  }, [searchQuery, messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollBottomBtn(false);
   };
 
-  const filteredMatches = matches.filter(m =>
-    m.user.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const scrollToMessageId = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2500);
+    }
+  };
 
-  // IF AN ACTIVE CHAT IS SELECTED
-  if (activeMatch) {
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const isUp = scrollHeight - scrollTop - clientHeight > 180;
+    setShowScrollBottomBtn(isUp);
+  };
+
+  // SEND TEXT MESSAGE
+  const handleSendMessage = async (text: string) => {
+    if (!activeMatch) return;
+
+    const newMsg: Message = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      matchId: activeMatch.id,
+      senderId: 'user_me',
+      senderName: 'You',
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      replyTo: replyingTo
+        ? {
+            id: replyingTo.id,
+            senderId: replyingTo.senderId,
+            senderName: replyingTo.senderId === 'user_me' ? 'You' : activeMatch.user.name,
+            text: replyingTo.text || 'Media Message'
+          }
+        : undefined
+    };
+
+    // Optimistic insert
+    setMessages(prev => [...prev, newMsg]);
+    setReplyingTo(null);
+
+    // Update match preview in list
+    setMatches(prev => prev.map(m => m.id === activeMatch.id ? { ...m, lastMessage: text, lastMessageTime: 'Just now' } : m));
+
+    // Try server post
+    try {
+      const res = await fetch(`/api/chat/${activeMatch.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMsg)
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'delivered' } : m));
+      } else {
+        setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'sent' } : m));
+      }
+    } catch {
+      setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'sent' } : m));
+    }
+
+    // SIMULATE MATCH TYPING & REPLY
+    triggerSimulatedMatchReply(activeMatch);
+  };
+
+  // SEND MEDIA / FILE ATTACHMENT
+  const handleSendMedia = async (file: File, type: 'image' | 'video' | 'file', caption?: string) => {
+    if (!activeMatch) return;
+
+    const previewUrl = URL.createObjectURL(file);
+    const newMsg: Message = {
+      id: `msg_media_${Date.now()}`,
+      matchId: activeMatch.id,
+      senderId: 'user_me',
+      senderName: 'You',
+      text: caption || '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sending',
+      isImage: type === 'image',
+      imageUrl: type === 'image' ? previewUrl : undefined,
+      imageCaption: type === 'image' ? caption : undefined,
+      isVideo: type === 'video',
+      videoUrl: type === 'video' ? previewUrl : undefined,
+      isFile: type === 'file',
+      fileUrl: previewUrl,
+      fileName: file.name,
+      fileSize: `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+
+    // Send payload to backend
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      if (caption) formData.append('caption', caption);
+
+      const res = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'delivered', imageUrl: data.url || m.imageUrl } : m));
+      } else {
+        setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'sent' } : m));
+      }
+    } catch {
+      setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'sent' } : m));
+    }
+
+    triggerSimulatedMatchReply(activeMatch);
+  };
+
+  // SEND VOICE NOTE
+  const handleSendVoiceNote = async (audioUrl: string, duration: string, waveform: number[]) => {
+    if (!activeMatch) return;
+
+    const newMsg: Message = {
+      id: `msg_voice_${Date.now()}`,
+      matchId: activeMatch.id,
+      senderId: 'user_me',
+      senderName: 'You',
+      text: '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent',
+      isAudio: true,
+      audioUrl,
+      audioDuration: duration,
+      audioWaveform: waveform
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setMatches(prev => prev.map(m => m.id === activeMatch.id ? { ...m, lastMessage: `🎤 Voice note (${duration})`, lastMessageTime: 'Just now' } : m));
+
+    triggerSimulatedMatchReply(activeMatch);
+  };
+
+  // SEND FIRST DATE INVITE
+  const handleSendDateInvite = (dateData: DateInviteData) => {
+    if (!activeMatch) return;
+
+    const newMsg: Message = {
+      id: `msg_date_${Date.now()}`,
+      matchId: activeMatch.id,
+      senderId: 'user_me',
+      senderName: 'You',
+      text: '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent',
+      isDateInvite: true,
+      dateInvite: dateData
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setMatches(prev => prev.map(m => m.id === activeMatch.id ? { ...m, lastMessage: `🍸 Date Invite: ${dateData.title}`, lastMessageTime: 'Just now' } : m));
+
+    // Simulate match accepting date invite after 3 seconds
+    setTimeout(() => {
+      setMessages(prev => prev.map(m => {
+        if (m.id === newMsg.id && m.dateInvite) {
+          return {
+            ...m,
+            dateInvite: {
+              ...m.dateInvite,
+              status: 'accepted'
+            }
+          };
+        }
+        return m;
+      }));
+
+      const acceptMsg: Message = {
+        id: `msg_resp_${Date.now()}`,
+        matchId: activeMatch.id,
+        senderId: activeMatch.user.id,
+        senderName: activeMatch.user.name,
+        text: `I would love that! Count me in for ${dateData.title} ✨🥂`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'delivered'
+      };
+
+      setMessages(prev => [...prev, acceptMsg]);
+      triggerHaptic('success');
+      showNativeToast(`${activeMatch.user.name} accepted your date proposal! 🥂`);
+    }, 3200);
+  };
+
+  // SIMULATE MATCH TYPING AND RESPONDING
+  const triggerSimulatedMatchReply = (targetMatch: Match) => {
+    // 1. Set typing indicator
+    setTimeout(() => {
+      setMatches(prev => prev.map(m => m.id === targetMatch.id ? { ...m, isTyping: true } : m));
+    }, 1200);
+
+    // 2. Mark our messages as read
+    setTimeout(() => {
+      setMessages(prev => prev.map(m => m.senderId === 'user_me' ? { ...m, status: 'read' } : m));
+    }, 2000);
+
+    // 3. Post reply
+    setTimeout(() => {
+      const dynamicReplies = [
+        `Haha that's amazing! You just made my day 😊`,
+        `I was literally thinking the exact same thing! What else are you up to this weekend?`,
+        `Sounds like a plan! Let's definitely do it ✨`,
+        `Your taste in music and places is top tier 👌`,
+        `Can't wait to chat more about that over coffee ☕`
+      ];
+      const replyText = dynamicReplies[Math.floor(Math.random() * dynamicReplies.length)];
+
+      const incomingMsg: Message = {
+        id: `msg_in_${Date.now()}`,
+        matchId: targetMatch.id,
+        senderId: targetMatch.user.id,
+        senderName: targetMatch.user.name,
+        text: replyText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'delivered'
+      };
+
+      setMatches(prev => prev.map(m => m.id === targetMatch.id ? { ...m, isTyping: false, lastMessage: replyText, lastMessageTime: 'Just now' } : m));
+      setMessages(prev => [...prev, incomingMsg]);
+      triggerHaptic('light');
+    }, 3800);
+  };
+
+  // REACT TO MESSAGE
+  const handleReact = (messageId: string, emoji: string) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== messageId) return msg;
+
+      const currentReactions = msg.reactions ? [...msg.reactions] : [];
+      const existingReactionIdx = currentReactions.findIndex(r => r.emoji === emoji);
+
+      if (existingReactionIdx >= 0) {
+        const reaction = currentReactions[existingReactionIdx];
+        if (reaction.userIds.includes('user_me')) {
+          reaction.userIds = reaction.userIds.filter(id => id !== 'user_me');
+          if (reaction.userIds.length === 0) {
+            currentReactions.splice(existingReactionIdx, 1);
+          }
+        } else {
+          reaction.userIds.push('user_me');
+        }
+      } else {
+        currentReactions.push({ emoji, userIds: ['user_me'] });
+      }
+
+      return {
+        ...msg,
+        reactions: currentReactions
+      };
+    }));
+  };
+
+  // EDIT MESSAGE
+  const handleEditMessage = async (messageId: string, newText: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, text: newText, isEdited: true, editTimestamp: 'Just now' } : m));
+    showNativeToast('Message edited');
+  };
+
+  // DELETE FOR ME
+  const handleDeleteForMe = (messageId: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, deletedForMe: true } : m));
+    showNativeToast('Message removed for you');
+  };
+
+  // DELETE FOR EVERYONE
+  const handleDeleteForEveryone = (messageId: string) => {
+    setMessages(prev => prev.map(m => m.id === messageId ? {
+      ...m,
+      text: '🚫 This message was deleted',
+      deletedForEveryone: true,
+      imageUrl: undefined,
+      isImage: false,
+      isAudio: false,
+      isVideo: false
+    } : m));
+    showNativeToast('Message deleted for everyone');
+  };
+
+  // FORWARD MESSAGE
+  const handleForwardMessage = (targetMatchId: string, msg: Message) => {
+    const forwarded: Message = {
+      id: `msg_fwd_${Date.now()}`,
+      matchId: targetMatchId,
+      senderId: 'user_me',
+      senderName: 'You',
+      text: msg.text || '',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'sent',
+      isImage: msg.isImage,
+      imageUrl: msg.imageUrl,
+      isAudio: msg.isAudio,
+      audioUrl: msg.audioUrl,
+      isVideo: msg.isVideo,
+      videoUrl: msg.videoUrl
+    };
+
+    setMatches(prev => prev.map(m => m.id === targetMatchId ? { ...m, lastMessage: forwarded.text || 'Forwarded media', lastMessageTime: 'Just now' } : m));
+  };
+
+  // DATE INVITE RESPONSE (Accept / Decline)
+  const handleDateInviteResponse = (messageId: string, status: 'accepted' | 'declined') => {
+    setMessages(prev => prev.map(m => {
+      if (m.id === messageId && m.dateInvite) {
+        return {
+          ...m,
+          dateInvite: {
+            ...m.dateInvite,
+            status
+          }
+        };
+      }
+      return m;
+    }));
+
+    if (status === 'accepted') {
+      triggerHaptic('success');
+      showNativeToast('Date accepted! Have an unforgettable time! 🍸');
+    }
+  };
+
+  // CALL HANDLERS
+  const handleEndCall = (durationSeconds: number, status: 'completed' | 'missed' | 'declined') => {
+    if (activeMatch) {
+      const callEventMsg: Message = {
+        id: `call_${Date.now()}`,
+        matchId: activeMatch.id,
+        senderId: 'user_me',
+        senderName: 'You',
+        text: '',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'sent',
+        isCallEvent: true,
+        callEvent: {
+          type: activeCall?.type || 'voice',
+          status,
+          durationSeconds: durationSeconds > 0 ? durationSeconds : undefined
+        }
+      };
+      setMessages(prev => [...prev, callEventMsg]);
+    }
+    setActiveCall(null);
+  };
+
+  // SAFETY ACTIONS
+  const handleBlockUser = async () => {
+    if (!activeMatch) return;
+    try {
+      await fetch('/api/chat/block', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: activeMatch.user.id })
+      });
+    } catch {}
+    setMatches(prev => prev.filter(m => m.id !== activeMatch.id));
+    setActiveMatch(null);
+    setShowBlockModal(false);
+    showNativeToast(`${activeMatch.user.name} has been blocked.`);
+  };
+
+  const handleUnmatchUser = () => {
+    if (!activeMatch) return;
+    setMatches(prev => prev.filter(m => m.id !== activeMatch.id));
+    setActiveMatch(null);
+    setShowUnmatchModal(false);
+    showNativeToast(`Unmatched with ${activeMatch.user.name}.`);
+  };
+
+  const handleReport = async (reason: string, details: string) => {
+    if (!activeMatch) return;
+    try {
+      await fetch('/api/chat/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: activeMatch.user.id,
+          messageId: reportingMessage?.id,
+          reason,
+          details
+        })
+      });
+    } catch {}
+    onReportProfile(activeMatch.user);
+    setShowReportModal(false);
+    setReportingMessage(null);
+  };
+
+  // CONVERSATION ACTIONS (Pin, Mute, Clear)
+  const handleTogglePin = (matchId: string) => {
+    triggerHaptic('light');
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, isPinned: !m.isPinned } : m));
+    showNativeToast('Conversation pin updated');
+  };
+
+  const handleToggleMute = (matchId: string) => {
+    triggerHaptic('light');
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, isMuted: !m.isMuted } : m));
+    showNativeToast('Notification mute settings updated');
+  };
+
+  const handleClearHistory = () => {
+    triggerHaptic('medium');
+    setMessages([]);
+    showNativeToast('Chat history cleared');
+  };
+
+  // IF NO CHAT SELECTED -> SHOW FULL CONVERSATION LIST
+  if (!activeMatch) {
     return (
-      <div className="flex-1 flex flex-col h-[calc(100vh-120px)] max-w-md mx-auto w-full bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
-        
-        {/* Chat Header */}
-        <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 py-2.5 flex items-center justify-between z-20 shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => { triggerHaptic('light'); setActiveMatch(null); }}
-              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </button>
+      <div className="flex-1 h-[calc(100vh-120px)] max-w-4xl mx-auto w-full">
+        <ConversationList
+          matches={matches}
+          selectedMatchId={null}
+          onSelectMatch={(m) => setActiveMatch(m)}
+          onTogglePin={handleTogglePin}
+          onToggleMute={handleToggleMute}
+          onMarkRead={(id) => setMatches(prev => prev.map(m => m.id === id ? { ...m, unreadCount: 0 } : m))}
+          onDeleteMatch={(id) => setMatches(prev => prev.filter(m => m.id !== id))}
+          onOpenMatchProfile={(user) => {
+            const found = matches.find(m => m.user.id === user.id);
+            if (found) {
+              setActiveMatch(found);
+              setShowProfileDrawer(true);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
-            <div className="relative">
-              <img
-                src={activeMatch.user.photos[0]}
-                alt={activeMatch.user.name}
-                className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
-              />
-              {activeMatch.onlineStatus === 'online' && (
-                <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-900" />
-              )}
-            </div>
+  // ACTIVE CONVERSATION FULL VIEW
+  return (
+    <div className="flex-1 flex flex-col h-[calc(100vh-120px)] max-w-4xl mx-auto w-full bg-[#0e0f11] text-white relative overflow-hidden border-x border-white/5 shadow-2xl">
+      
+      {/* 1. Modern Conversation Header */}
+      <ChatHeader
+        match={activeMatch}
+        onBack={() => setActiveMatch(null)}
+        onVoiceCall={() => setActiveCall({ type: 'voice' })}
+        onVideoCall={() => setActiveCall({ type: 'video' })}
+        onOpenSearch={() => setShowSearch(true)}
+        onOpenDateIdeas={() => setShowDateIdeasModal(true)}
+        onOpenProfileDrawer={() => setShowProfileDrawer(true)}
+        onTogglePin={() => handleTogglePin(activeMatch.id)}
+        onToggleMute={() => handleToggleMute(activeMatch.id)}
+        onClearHistory={handleClearHistory}
+        onUnmatch={() => setShowUnmatchModal(true)}
+        onBlock={() => setShowBlockModal(true)}
+        onReport={() => setShowReportModal(true)}
+      />
 
-            <div>
-              <h3 className="font-bold text-sm text-gray-900 dark:text-white flex items-center gap-1">
-                <span>{activeMatch.user.name}</span>
-                <span className="text-xs font-normal text-gray-400">, {activeMatch.user.age}</span>
-              </h3>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                {activeMatch.onlineStatus === 'online' ? 'Active Now' : 'Recently Active'}
-              </p>
-            </div>
-          </div>
+      {/* 2. In-Chat Search Bar */}
+      {showSearch && (
+        <ChatSearch
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          resultCount={searchMatchesIndexes.length}
+          currentResultIndex={currentSearchIndex}
+          onPrevResult={() => {
+            const prev = (currentSearchIndex - 1 + searchMatchesIndexes.length) % searchMatchesIndexes.length;
+            setCurrentSearchIndex(prev);
+            scrollToMessageId(messages[searchMatchesIndexes[prev]].id);
+          }}
+          onNextResult={() => {
+            const next = (currentSearchIndex + 1) % searchMatchesIndexes.length;
+            setCurrentSearchIndex(next);
+            scrollToMessageId(messages[searchMatchesIndexes[next]].id);
+          }}
+          onClose={() => {
+            setShowSearch(false);
+            setSearchQuery('');
+          }}
+        />
+      )}
 
-          {/* Call & AI Date Actions */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleFetchDateSpots}
-              className="p-2 rounded-xl text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
-              title="AI Date Spot Suggestions"
-            >
-              <Compass className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => { triggerHaptic('medium'); setActiveCallModal('audio'); }}
-              className="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              title="Start Voice Call"
-            >
-              <Phone className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => { triggerHaptic('heavy'); setActiveCallModal('video'); }}
-              className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-              title="Start Video Call"
-            >
-              <Video className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Message Thread Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          
-          {/* Match Intro Tag */}
-          <div className="text-center my-4">
+      {/* 3. Messages Feed Scrollable Area */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10"
+      >
+        {/* Match Header Hero Card */}
+        <div className="text-center my-6 space-y-2 select-none">
+          <div className="relative inline-block">
             <img
               src={activeMatch.user.photos[0]}
-              alt=""
-              className="w-16 h-16 rounded-full mx-auto object-cover mb-2 ring-4 ring-rose-100 dark:ring-rose-950/50 shadow-md"
+              alt={activeMatch.user.name}
+              onClick={() => setShowProfileDrawer(true)}
+              className="w-20 h-20 rounded-full mx-auto object-cover ring-4 ring-rose-500/80 shadow-2xl cursor-pointer hover:scale-105 transition-transform"
             />
-            <p className="font-bold text-sm text-gray-900 dark:text-white">
-              You matched with {activeMatch.user.name}!
-            </p>
+            <div className="absolute -bottom-1 -right-1 p-1 bg-[#0e0f11] rounded-full">
+              <span className="w-3 h-3 bg-emerald-500 rounded-full block" />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-extrabold text-base text-white flex items-center justify-center gap-1.5">
+              <span>You matched with {activeMatch.user.name}</span>
+              <Sparkles className="w-4 h-4 text-amber-400 fill-amber-400" />
+            </h3>
             <p className="text-xs text-gray-400 mt-0.5">
               Matched {activeMatch.matchedAt} • {activeMatch.user.compatibilityScore}% Compatibility
             </p>
           </div>
 
-          {/* Messages */}
-          {activeMatch.lastMessage && (
-            <div
-              className={`flex flex-col ${
-                activeMatch.lastMessage.senderId === 'user_me' ? 'items-end' : 'items-start'
-              }`}
-            >
-              <div
-                className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-sm shadow-xs ${
-                  activeMatch.lastMessage.senderId === 'user_me'
-                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-br-none'
-                    : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-none border border-gray-100 dark:border-gray-700'
-                }`}
-              >
-                {activeMatch.lastMessage.isImage && activeMatch.lastMessage.imageUrl && (
-                  <img src={activeMatch.lastMessage.imageUrl} alt="" className="rounded-xl mb-1.5 max-h-48 w-full object-cover" />
-                )}
-
-                {activeMatch.lastMessage.isAudio ? (
-                  <div className="flex items-center gap-3 py-1">
-                    <button
-                      onClick={() => setIsPlayingAudioId(prev => prev ? null : 'm1')}
-                      className="p-2 rounded-full bg-white/20 text-white"
-                    >
-                      {isPlayingAudioId === 'm1' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    </button>
-                    <div>
-                      <div className="w-24 h-2 bg-white/30 rounded-full overflow-hidden">
-                        <div className={`h-full bg-white rounded-full ${isPlayingAudioId === 'm1' ? 'w-2/3 animate-pulse' : 'w-0'}`} />
-                      </div>
-                      <span className="text-[10px] opacity-80 mt-1 block">{activeMatch.lastMessage.audioDuration}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="leading-relaxed">{activeMatch.lastMessage.text}</p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-1 px-1">
-                <span>{activeMatch.lastMessage.timestamp}</span>
-                {activeMatch.lastMessage.senderId === 'user_me' && (
-                  <CheckCheck className="w-3 h-3 text-rose-500" />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* AI Icebreaker Suggestions Tray if open */}
-          {showAiWingman && (
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/40 dark:to-pink-950/40 border border-purple-200 dark:border-purple-800 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-purple-900 dark:text-purple-300">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-purple-600 fill-purple-600" />
-                  <span>AI Wingman Opener Suggestions</span>
-                </div>
-                <button onClick={() => setShowAiWingman(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {loadingStarters ? (
-                <div className="text-center py-3 text-xs text-purple-600 animate-pulse">
-                  Analyzing {activeMatch.user.name}'s bio and generating clever openers...
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {aiStarters.map((starter, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        triggerHaptic('light');
-                        setInputText(starter);
-                        setShowAiWingman(false);
-                      }}
-                      className="w-full text-left p-2.5 rounded-xl bg-white dark:bg-gray-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-xs font-medium text-gray-800 dark:text-gray-200 transition-colors border border-purple-100 dark:border-purple-900"
-                    >
-                      "{starter}"
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Input Bar */}
-        <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
-          
-          {/* Quick AI Starter trigger pill */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-center gap-2 pt-2">
             <button
-              onClick={handleFetchIcebreakers}
-              className="px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 text-[11px] font-bold flex items-center gap-1 hover:bg-purple-200 transition-colors"
+              onClick={() => setShowDateIdeasModal(true)}
+              className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 hover:from-amber-500/30 hover:to-rose-500/30 border border-amber-500/30 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition-all shadow-xs"
             >
-              <Sparkles className="w-3 h-3 fill-current" />
-              <span>AI Wingman Opener</span>
+              <span>Explore First Date Ideas 🍸</span>
             </button>
-
             <button
-              onClick={handleFetchDateSpots}
-              className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1 hover:bg-amber-200 transition-colors"
+              onClick={() => setShowProfileDrawer(true)}
+              className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-gray-300 transition-colors"
             >
-              <Compass className="w-3 h-3" />
-              <span>Date Ideas</span>
+              <span>View Profile</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleSendImage}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              title="Attach Photo"
-            >
-              <Image className="w-5 h-5" />
-            </button>
+          <div className="flex items-center justify-center gap-1 text-[11px] text-gray-500 pt-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Messages are end-to-end encrypted & verified by CREST</span>
+          </div>
+        </div>
 
-            <button
-              onClick={handleSendVoiceNote}
-              className="p-2 text-gray-400 hover:text-rose-500"
-              title="Record Voice Note"
-            >
-              <Mic className="w-5 h-5" />
-            </button>
+        {/* Render Messages */}
+        {messages.map((message, idx) => {
+          const isMe = message.senderId === 'user_me';
+          const prevMsg = messages[idx - 1];
+          const nextMsg = messages[idx + 1];
 
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={`Message ${activeMatch.user.name}...`}
-              className="flex-1 py-2 px-3.5 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+          const isFirstInGroup = !prevMsg || prevMsg.senderId !== message.senderId;
+          const isLastInGroup = !nextMsg || nextMsg.senderId !== message.senderId;
+
+          return (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isMe={isMe}
+              matchUser={activeMatch.user}
+              isFirstInGroup={isFirstInGroup}
+              isLastInGroup={isLastInGroup}
+              searchHighlight={searchQuery}
+              isHighlighted={highlightedMessageId === message.id}
+              onReply={(msg) => setReplyingTo(msg)}
+              onReact={handleReact}
+              onEdit={handleEditMessage}
+              onDeleteForMe={handleDeleteForMe}
+              onDeleteForEveryone={handleDeleteForEveryone}
+              onForward={(msg) => setForwardingMessage(msg)}
+              onReport={(msg) => {
+                setReportingMessage(msg);
+                setShowReportModal(true);
+              }}
+              onOpenLightbox={(url, type, caption) => setLightboxMedia({ url, type, caption })}
+              onDateInviteResponse={handleDateInviteResponse}
+              onScrollToMessage={scrollToMessageId}
+              onRetryFailedMessage={(msg) => handleSendMessage(msg.text || '')}
             />
+          );
+        })}
 
-            <button
-              onClick={handleSend}
-              disabled={!inputText.trim()}
-              className={`p-2.5 rounded-full text-white transition-all ${
-                inputText.trim()
-                  ? 'bg-gradient-to-r from-rose-500 to-pink-500 scale-105 shadow-md'
-                  : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <Send className="w-4 h-4 fill-current" />
-            </button>
-          </div>
-        </div>
-
-        {/* AI Date Spot Recommendations Modal */}
-        {showDateSpotModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
-            <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-5 shadow-2xl relative space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-                <div className="flex items-center gap-2 font-bold text-base text-gray-900 dark:text-white">
-                  <Compass className="w-5 h-5 text-amber-500" />
-                  <span>AI First Date Spots in {activeMatch.user.locationName}</span>
-                </div>
-                <button onClick={() => setShowDateSpotModal(false)} className="p-1 rounded-full text-gray-400">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {loadingDateSpots ? (
-                <p className="text-center py-6 text-xs text-amber-600 animate-pulse">
-                  Scouting the best romantic spots nearby...
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {dateSpots.map((spot, i) => (
-                    <div key={i} className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                      <h4 className="font-bold text-sm text-amber-900 dark:text-amber-200">{spot.name}</h4>
-                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">{spot.vibe} • {spot.activity}</p>
-                      <button
-                        onClick={() => {
-                          triggerHaptic('light');
-                          setInputText(`Hey! How about we check out ${spot.name} for our first date? 🍸`);
-                          setShowDateSpotModal(false);
-                        }}
-                        className="mt-2 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
-                      >
-                        Send as Invite Proposal →
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+        {/* Typing indicator bubble */}
+        {activeMatch.isTyping && (
+          <div className="flex items-center gap-2 my-1 animate-in fade-in">
+            <img
+              src={activeMatch.user.photos[0]}
+              alt=""
+              className="w-7 h-7 rounded-full object-cover ring-1 ring-white/10"
+            />
+            <div className="bg-[#1e2024] border border-white/10 px-3.5 py-2.5 rounded-2xl rounded-bl-xs flex items-center gap-1.5 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-rose-400 animate-bounce" />
+              <span className="w-2 h-2 rounded-full bg-rose-400 animate-bounce [animation-delay:0.2s]" />
+              <span className="w-2 h-2 rounded-full bg-rose-400 animate-bounce [animation-delay:0.4s]" />
             </div>
           </div>
         )}
 
-        {/* Video / Voice Call Modal */}
-        {activeCallModal && (
-          <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col items-center justify-between p-6 text-white">
-            <div className="text-center mt-8">
-              <img
-                src={activeMatch.user.photos[0]}
-                alt=""
-                className="w-24 h-24 rounded-full mx-auto object-cover ring-4 ring-rose-500 shadow-2xl animate-pulse"
-              />
-              <h3 className="text-2xl font-black mt-4">{activeMatch.user.name}</h3>
-              <p className="text-sm text-gray-400 mt-1">
-                {activeCallModal === 'video' ? 'Calling with Video...' : 'Audio Calling...'}
-              </p>
-            </div>
-
-            <div className="w-full max-w-xs bg-gray-900/80 rounded-2xl p-4 text-center border border-white/10">
-              <p className="text-xs text-gray-300">
-                🔒 CREST End-to-End Encrypted Native Call
-              </p>
-            </div>
-
-            <div className="flex items-center gap-6 mb-12">
-              <button
-                onClick={() => { triggerHaptic('heavy'); setActiveCallModal(null); }}
-                className="w-16 h-16 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-xl hover:scale-105"
-              >
-                <Phone className="w-8 h-8 transform rotate-[135deg]" />
-              </button>
-            </div>
-          </div>
-        )}
+        <div ref={messagesEndRef} />
       </div>
-    );
-  }
 
-  // MATCHES LIST DEFAULT VIEW
-  return (
-    <div className="flex-1 max-w-md mx-auto w-full px-4 pt-3 pb-24 space-y-5">
-      
-      {/* Search Input */}
-      <div className="relative">
-        <Search className="w-4 h-4 absolute left-3.5 top-3 text-gray-400" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search matches by name or passion..."
-          className="w-full py-2 pl-9 pr-4 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-rose-500"
+      {/* Floating Scroll-to-Bottom Button */}
+      {showScrollBottomBtn && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-20 right-5 z-20 p-2.5 rounded-full bg-[#18191c]/90 border border-white/20 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all backdrop-blur-md"
+          title="Scroll to bottom"
+        >
+          <ArrowDown className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* 4. Chat Composer */}
+      <ChatComposer
+        replyingTo={replyingTo}
+        onCancelReply={() => setReplyingTo(null)}
+        onSendMessage={handleSendMessage}
+        onSendMedia={handleSendMedia}
+        onSendVoiceNote={handleSendVoiceNote}
+        onSendDateInvite={handleSendDateInvite}
+        onTyping={(typing) => {
+          // Send typing indicator to backend
+        }}
+        onOpenDateIdeas={() => setShowDateIdeasModal(true)}
+      />
+
+      {/* 5. Modals and Overlays */}
+      {/* Lightbox */}
+      {lightboxMedia && (
+        <MediaLightbox
+          mediaUrl={lightboxMedia.url}
+          mediaType={lightboxMedia.type}
+          caption={lightboxMedia.caption}
+          senderName={activeMatch.user.name}
+          onClose={() => setLightboxMedia(null)}
         />
-      </div>
+      )}
 
-      {/* New Matches Row */}
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 px-1">
-          New Matches ({matches.length})
-        </h4>
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-          {matches.map((match) => (
-            <div
-              key={match.id}
-              onClick={() => { triggerHaptic('light'); setActiveMatch(match); }}
-              className="flex flex-col items-center gap-1 cursor-pointer group flex-shrink-0"
-            >
-              <div className="relative">
-                <img
-                  src={match.user.photos[0]}
-                  alt={match.user.name}
-                  className="w-16 h-16 rounded-full object-cover ring-2 ring-rose-500 p-0.5 group-hover:scale-105 transition-transform"
-                />
-                {match.onlineStatus === 'online' && (
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-900" />
-                )}
-              </div>
-              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 w-16 text-center truncate">
-                {match.user.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Voice & Video Call Modal */}
+      {activeCall && (
+        <ActiveCallModal
+          callType={activeCall.type}
+          user={activeMatch.user}
+          isIncoming={activeCall.isIncoming}
+          onEndCall={handleEndCall}
+        />
+      )}
 
-      {/* Messages List */}
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 px-1">
-          Conversations
-        </h4>
-        <div className="space-y-1">
-          {filteredMatches.map((match) => (
-            <div
-              key={match.id}
-              onClick={() => { triggerHaptic('light'); setActiveMatch(match); }}
-              className="p-3 rounded-2xl bg-white dark:bg-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-800 border border-gray-100 dark:border-gray-800 flex items-center gap-3 cursor-pointer transition-colors"
-            >
-              <div className="relative flex-shrink-0">
-                <img
-                  src={match.user.photos[0]}
-                  alt={match.user.name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-                {match.onlineStatus === 'online' && (
-                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-gray-900" />
-                )}
-              </div>
+      {/* User Profile Slide-over Drawer */}
+      {showProfileDrawer && (
+        <UserProfileDrawer
+          user={activeMatch.user}
+          onClose={() => setShowProfileDrawer(false)}
+          onOpenDateIdeas={() => setShowDateIdeasModal(true)}
+          onUnmatch={() => setShowUnmatchModal(true)}
+          onBlock={() => setShowBlockModal(true)}
+          onReport={() => setShowReportModal(true)}
+        />
+      )}
 
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline">
-                  <h5 className="font-bold text-sm text-gray-900 dark:text-white truncate">
-                    {match.user.name}
-                  </h5>
-                  <span className="text-[10px] text-gray-400">{match.lastMessage?.timestamp || match.matchedAt}</span>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                  {match.lastMessage?.text || `Matched! Say hello to ${match.user.name}`}
-                </p>
-              </div>
+      {/* AI First Date Ideas Modal */}
+      {showDateIdeasModal && (
+        <DateIdeasModal
+          user={activeMatch.user}
+          onSendDateInvite={handleSendDateInvite}
+          onClose={() => setShowDateIdeasModal(false)}
+        />
+      )}
 
-              {match.unreadCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center">
-                  {match.unreadCount}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Block Confirmation Modal */}
+      {showBlockModal && (
+        <BlockConfirmModal
+          user={activeMatch.user}
+          onConfirmBlock={handleBlockUser}
+          onClose={() => setShowBlockModal(false)}
+        />
+      )}
+
+      {/* Unmatch Confirmation Modal */}
+      {showUnmatchModal && (
+        <UnmatchConfirmModal
+          user={activeMatch.user}
+          onConfirmUnmatch={handleUnmatchUser}
+          onClose={() => setShowUnmatchModal(false)}
+        />
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportModal
+          user={activeMatch.user}
+          message={reportingMessage}
+          onSubmitReport={handleReport}
+          onClose={() => {
+            setShowReportModal(false);
+            setReportingMessage(null);
+          }}
+        />
+      )}
+
+      {/* Forward Message Modal */}
+      {forwardingMessage && (
+        <ForwardModal
+          message={forwardingMessage}
+          matches={matches.filter(m => m.id !== activeMatch.id)}
+          onForward={handleForwardMessage}
+          onClose={() => setForwardingMessage(null)}
+        />
+      )}
     </div>
   );
 };

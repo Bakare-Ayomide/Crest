@@ -186,6 +186,257 @@ Return a JSON array of 3 starter strings.`;
     }
   });
 
+  // In-memory message store initialized per match
+  const messagesStore: Record<string, any[]> = {
+    match_1: [
+      {
+        id: 'msg_init_1',
+        matchId: 'match_1',
+        senderId: 'prof_1',
+        text: 'Hey Alex! I saw on your profile that you love road trips and indie gigs. Have you been to any concerts recently? 🎸',
+        timestamp: '10:14 AM',
+        createdAt: Date.now() - 3600000 * 3,
+        status: 'read'
+      },
+      {
+        id: 'msg_init_2',
+        matchId: 'match_1',
+        senderId: 'user_me',
+        text: 'Hey Victoria! Yes, just saw The Sunset Club live last month in Brooklyn! Their stage visuals were insane.',
+        timestamp: '10:28 AM',
+        createdAt: Date.now() - 3600000 * 2,
+        status: 'read'
+      },
+      {
+        id: 'msg_init_3',
+        matchId: 'match_1',
+        senderId: 'prof_1',
+        text: 'I love them! "Deadtide" is literally on repeat on my Spotify right now ✨',
+        timestamp: '10:42 AM',
+        createdAt: Date.now() - 3600000,
+        status: 'read',
+        reactions: [{ emoji: '❤️', userIds: ['user_me'] }]
+      }
+    ],
+    match_2: [
+      {
+        id: 'msg_m2_1',
+        matchId: 'match_2',
+        senderId: 'prof_5',
+        text: 'Hey Alex! Thanks for the super like 🌊. Loved your prompt about visiting Tokyo!',
+        timestamp: 'Yesterday 6:30 PM',
+        createdAt: Date.now() - 86400000,
+        status: 'read'
+      },
+      {
+        id: 'msg_m2_2',
+        matchId: 'match_2',
+        senderId: 'user_me',
+        text: 'Diving with humpback whales sounds unbelievable! Must have been surreal.',
+        timestamp: 'Yesterday 8:15 PM',
+        createdAt: Date.now() - 86400000 + 3600000,
+        status: 'read'
+      }
+    ],
+    match_3: [
+      {
+        id: 'msg_m3_1',
+        matchId: 'match_3',
+        senderId: 'prof_3',
+        text: 'Let us definitely grab tacos at La Taqueria this Friday! 🌮',
+        timestamp: 'Aug 8',
+        createdAt: Date.now() - 86400000 * 3,
+        status: 'read'
+      }
+    ]
+  };
+
+  const blockedUsers = new Set<string>();
+  const reportedTickets: any[] = [];
+
+  // Get messages for a match
+  app.get("/api/chat/:matchId/messages", (req, res) => {
+    const { matchId } = req.params;
+    const list = messagesStore[matchId] || [];
+    res.json({ messages: list });
+  });
+
+  // Send message to a match
+  app.post("/api/chat/:matchId/messages", async (req, res) => {
+    const { matchId } = req.params;
+    const message = req.body;
+
+    if (!message || (!message.text && !message.imageUrl && !message.audioUrl && !message.videoUrl && !message.fileUrl && !message.isDateInvite)) {
+      return res.status(400).json({ error: "Empty message payload" });
+    }
+
+    if (!messagesStore[matchId]) {
+      messagesStore[matchId] = [];
+    }
+
+    const newMsg = {
+      ...message,
+      id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      matchId,
+      createdAt: message.createdAt || Date.now(),
+      timestamp: message.timestamp || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      status: "delivered",
+    };
+
+    messagesStore[matchId].push(newMsg);
+
+    res.json({ message: newMsg });
+  });
+
+  // Update message (reactions, edits, read status, pin)
+  app.patch("/api/chat/:matchId/messages/:messageId", (req, res) => {
+    const { matchId, messageId } = req.params;
+    const updates = req.body;
+
+    if (!messagesStore[matchId]) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const index = messagesStore[matchId].findIndex((m) => m.id === messageId);
+    if (index === -1) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    messagesStore[matchId][index] = {
+      ...messagesStore[matchId][index],
+      ...updates,
+    };
+
+    res.json({ message: messagesStore[matchId][index] });
+  });
+
+  // Delete message
+  app.delete("/api/chat/:matchId/messages/:messageId", (req, res) => {
+    const { matchId, messageId } = req.params;
+    const { deleteForEveryone } = req.query;
+
+    if (!messagesStore[matchId]) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const index = messagesStore[matchId].findIndex((m) => m.id === messageId);
+    if (index === -1) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    if (deleteForEveryone === "true") {
+      messagesStore[matchId][index] = {
+        ...messagesStore[matchId][index],
+        text: "🚫 This message was deleted",
+        isImage: false,
+        imageUrl: undefined,
+        isAudio: false,
+        audioUrl: undefined,
+        isVideo: false,
+        videoUrl: undefined,
+        deletedForEveryone: true,
+      };
+    } else {
+      messagesStore[matchId][index] = {
+        ...messagesStore[matchId][index],
+        deletedForMe: true,
+      };
+    }
+
+    res.json({ success: true, message: messagesStore[matchId][index] });
+  });
+
+  // Media upload endpoint with validation
+  app.post("/api/chat/upload", (req, res) => {
+    const { dataUrl, fileName, mimeType, size } = req.body;
+
+    if (!dataUrl) {
+      return res.status(400).json({ error: "Missing data payload" });
+    }
+
+    // Validate size limit (max 50MB)
+    if (size && size > 50 * 1024 * 1024) {
+      return res.status(413).json({ error: "File exceeds 50MB limit" });
+    }
+
+    // In a production server we'd store in Google Cloud Storage / S3 / Firestore bucket.
+    // For fast in-app experience, returning optimized base64 data URL
+    res.json({
+      url: dataUrl,
+      fileName: fileName || "attachment",
+      mimeType: mimeType || "application/octet-stream",
+      size: size || 0,
+    });
+  });
+
+  // URL preview extractor
+  app.post("/api/chat/url-preview", (req, res) => {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: "URL is required" });
+    }
+
+    try {
+      const parsed = new URL(url);
+      const domain = parsed.hostname.replace("www.", "");
+      
+      let title = `Link on ${domain}`;
+      let description = `Explore content from ${domain}`;
+      let image = "";
+
+      if (url.includes("spotify.com")) {
+        title = "Spotify Music & Playlists";
+        description = "Listen to curated tracks and top songs on Spotify.";
+        image = "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80";
+      } else if (url.includes("instagram.com")) {
+        title = "Instagram Profile / Post";
+        description = "View photos, reels, and stories on Instagram.";
+        image = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=600&q=80";
+      } else if (url.includes("youtube.com") || url.includes("youtu.be")) {
+        title = "YouTube Video";
+        description = "Watch high-definition videos and music streams on YouTube.";
+        image = "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&w=600&q=80";
+      } else if (url.includes("yelp.com") || url.includes("opentable.com")) {
+        title = "Restaurant & Cocktail Lounge";
+        description = "Reserve a table, see menus, and read reviews.";
+        image = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80";
+      }
+
+      res.json({
+        url,
+        title,
+        description,
+        image,
+        domain,
+      });
+    } catch (e) {
+      res.status(400).json({ error: "Invalid URL" });
+    }
+  });
+
+  // Block & Report safety endpoints
+  app.post("/api/chat/block", (req, res) => {
+    const { userId, matchId } = req.body;
+    if (userId) blockedUsers.add(userId);
+    res.json({ success: true, message: `User ${userId} has been blocked.` });
+  });
+
+  app.post("/api/chat/report", (req, res) => {
+    const { userId, userName, reason, details, reporterId } = req.body;
+    const ticket = {
+      id: `rep_${Date.now()}`,
+      reportedUserId: userId,
+      reportedUserName: userName || "Reported User",
+      reporterName: reporterId || "User",
+      reason: reason || "Inappropriate behavior",
+      details: details || "",
+      timestamp: new Date().toISOString(),
+      status: "open",
+    };
+    reportedTickets.push(ticket);
+    res.json({ success: true, ticket });
+  });
+
   // Vite middleware for dev or Static serve for prod
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
