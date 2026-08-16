@@ -12,6 +12,7 @@ export const CURRENT_USER: UserProfile = {
   age: 26,
   gender: 'male',
   distanceKm: 0,
+  coordinates: { lat: 37.7749, lng: -122.4194 },
   bio: 'Software engineer & weekend trail runner 🏃‍♂️. Always searching for the best espresso in town and someone who can beat me at Catan. Big fan of live indie gigs & outdoor photography.',
   photos: [
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
@@ -61,6 +62,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     age: 26,
     gender: 'female',
     distanceKm: 2,
+    coordinates: { lat: 37.7849, lng: -122.4094 },
     bio: 'Fashion designer & sunset enthusiast ✨. Passionate about art galleries, tropical resort travel 🌴, and curated playlists.',
     photos: [
       victoriaGlam,
@@ -86,7 +88,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     jobTitle: 'Creative Director',
     company: 'Maison Luxe',
     education: 'Parsons School of Design',
-    locationName: 'USA, NEW YORK',
+    locationName: 'San Francisco, CA',
     height: '5\'8"',
     zodiac: 'Leo ♌',
     lifestyle: {
@@ -115,7 +117,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     name: 'Marcus Vance',
     age: 28,
     gender: 'male',
-    distanceKm: 5,
+    distanceKm: 4,
+    coordinates: { lat: 37.7599, lng: -122.4148 },
     bio: 'Chef & restaurant owner 🍳. Obsessed with natural wines, ramen pop-ups, and coastal surfing trips. Teach me something I don’t know!',
     photos: [
       'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=80',
@@ -123,7 +126,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     ],
     verified: true,
     verifiedBadge: true,
-    interests: ['Culinary', 'Surfing', 'Natural Wine', 'Live Jazz', 'Camping'],
+    interests: ['Culinary', 'Surfing', 'Natural Wine', 'Live Jazz', 'Camping', 'Coffee'],
     prompts: [
       {
         id: 'mp1',
@@ -139,7 +142,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     zodiac: 'Leo ♌',
     lifestyle: {
       pets: 'Dog & Cat 🐶🐱',
-      drinking: 'Wine lover 🍷',
+      drinking: 'Socially 🍷',
+      smoking: 'Never 🚭',
       workout: 'Surfing & Gym 🏄‍♂️'
     },
     lookingFor: 'Long-term relationship',
@@ -151,7 +155,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     name: 'SHINDARA',
     age: 24,
     gender: 'female',
-    distanceKm: 2,
+    distanceKm: 3,
+    coordinates: { lat: 37.7649, lng: -122.4294 },
     bio: 'Art director & minimalist ✨. Always seeking vibrant modern art exhibitions, cozy brunch spots, and sunset roadtrips.',
     photos: [
       shindaraArtPortrait,
@@ -160,7 +165,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     ],
     verified: true,
     verifiedBadge: true,
-    interests: ['Modern Art', 'Fashion', 'Brunch', 'Aesthetic Interiors', 'Photography'],
+    interests: ['Modern Art', 'Fashion', 'Brunch', 'Aesthetic Interiors', 'Photography', 'Music'],
     prompts: [
       {
         id: 'myp1',
@@ -171,7 +176,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     jobTitle: 'Art Director',
     company: 'Vogue Creative',
     education: 'NYU Tisch',
-    locationName: 'SoHo, New York',
+    locationName: 'Hayes Valley, SF',
     height: '5\'7"',
     zodiac: 'Gemini ♊',
     lifestyle: {
@@ -195,6 +200,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     age: 25,
     gender: 'female',
     distanceKm: 5,
+    coordinates: { lat: 37.7949, lng: -122.3994 },
     bio: 'Resort fashion icon & nature lover 🌴. Passionate about warm spring getaways, tropical nature trails, and chic evening dinners.',
     photos: [
       pehLumieResort,
@@ -203,7 +209,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     ],
     verified: true,
     verifiedBadge: true,
-    interests: ['Resorts', 'Nature', 'Haute Couture', 'Travel', 'Fine Dining'],
+    interests: ['Travel', 'Nature', 'Haute Couture', 'Fitness', 'Fine Dining', 'Movies'],
     prompts: [
       {
         id: 'ep1',
@@ -214,7 +220,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     jobTitle: 'Luxury Brand Ambassador',
     company: 'Resort Life',
     education: 'Columbia University',
-    locationName: 'Manhattan, New York',
+    locationName: 'Financial District, SF',
     height: '5\'9"',
     zodiac: 'Sagittarius ♐',
     lifestyle: {
@@ -228,7 +234,7 @@ export const MOCK_PROFILES: UserProfile[] = [
       childrenCount: 'None',
       lookingForGender: 'Men 👨'
     },
-    lookingFor: 'Long-term relationship',
+    lookingFor: 'Casual dating',
     compatibilityScore: 92,
     likedYou: true
   },
@@ -237,7 +243,8 @@ export const MOCK_PROFILES: UserProfile[] = [
     name: 'Chloe Bennett',
     age: 26,
     gender: 'female',
-    distanceKm: 4,
+    distanceKm: 6,
+    coordinates: { lat: 37.7449, lng: -122.4494 },
     bio: 'Marine biologist studying kelp forests 🐋. Big outdoors energy, acoustic guitar player, and maker of the world’s best cinnamon rolls.',
     photos: [
       'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80',
@@ -245,7 +252,7 @@ export const MOCK_PROFILES: UserProfile[] = [
     ],
     verified: true,
     verifiedBadge: true,
-    interests: ['Marine Life', 'Scuba Diving', 'Acoustic Guitar', 'Baking', 'Environmentalism'],
+    interests: ['Marine Life', 'Scuba Diving', 'Music', 'Baking', 'Outdoors', 'Hiking'],
     prompts: [
       {
         id: 'cp1',
@@ -261,12 +268,123 @@ export const MOCK_PROFILES: UserProfile[] = [
     zodiac: 'Pisces ♓',
     lifestyle: {
       pets: 'Golden Retriever owner 🐕',
-      drinking: 'Occasionally 🥂'
+      drinking: 'Socially 🥂',
+      smoking: 'Never 🚭'
     },
     lookingFor: 'Long-term relationship',
     compatibilityScore: 96,
     compatibilityReason: '96% Match! Shared passion for nature, coffee and music.',
     superLikedYou: true
+  },
+  {
+    id: 'prof_6',
+    name: 'Liam Chen',
+    age: 29,
+    gender: 'male',
+    distanceKm: 8,
+    coordinates: { lat: 37.8049, lng: -122.4294 },
+    bio: 'Architect & bouldering fanatic 🧗‍♂️. Always looking for brutalist buildings, synth concerts, and third-wave matcha spots.',
+    photos: [
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=900&q=80'
+    ],
+    verified: true,
+    verifiedBadge: true,
+    interests: ['Technology', 'Fitness', 'Art', 'Gaming', 'Coffee', 'Outdoors'],
+    prompts: [
+      {
+        id: 'lp1',
+        question: 'My most irrational fear...',
+        answer: 'Leaving a museum without buying a postcard.'
+      }
+    ],
+    jobTitle: 'Principal Architect',
+    company: 'Form & Space Studio',
+    education: 'Cornell Architecture',
+    locationName: 'Marina District, SF',
+    height: '6\'2"',
+    zodiac: 'Libra ♎',
+    lifestyle: {
+      pets: 'None yet',
+      drinking: 'Socially 🍸',
+      smoking: 'Never 🚭',
+      workout: 'Climbing 4x a week 🧗'
+    },
+    lookingFor: 'Relationship',
+    compatibilityScore: 91
+  },
+  {
+    id: 'prof_7',
+    name: 'Elena Rostova',
+    age: 27,
+    gender: 'female',
+    distanceKm: 14,
+    coordinates: { lat: 37.8649, lng: -122.2694 },
+    bio: 'Cellist & AI researcher 🎻🤖. Exploring the intersection of generative soundscapes and algorithmic jazz. Tea lover, avid chess player.',
+    photos: [
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80'
+    ],
+    verified: true,
+    verifiedBadge: true,
+    interests: ['Music', 'Technology', 'Reading', 'Travel', 'Art', 'Coffee'],
+    prompts: [
+      {
+        id: 'ep1',
+        question: 'Teach me something about...',
+        answer: 'Your favorite lesser-known indie film or sci-fi novel.'
+      }
+    ],
+    jobTitle: 'Research Fellow',
+    company: 'Berkeley AI Lab',
+    education: 'Stanford University',
+    locationName: 'Berkeley, CA',
+    height: '5\'8"',
+    zodiac: 'Aquarius ♒',
+    lifestyle: {
+      drinking: 'Socially 🍷',
+      smoking: 'Never 🚭',
+      workout: 'Yoga & Pilates 🧘'
+    },
+    lookingFor: 'Long-term relationship',
+    compatibilityScore: 95,
+    likedYou: true
+  },
+  {
+    id: 'prof_8',
+    name: 'Kai Rivera',
+    age: 25,
+    gender: 'nonbinary',
+    distanceKm: 11,
+    coordinates: { lat: 37.7689, lng: -122.4494 },
+    bio: 'Ceramicist & visual artist 🏺. Lover of thrifting, ambient vinyl, natural wine bars, and queer poetry slams.',
+    photos: [
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80'
+    ],
+    verified: false,
+    verifiedBadge: false,
+    interests: ['Art', 'Photography', 'Music', 'Movies', 'Coffee', 'Wine Tasting'],
+    prompts: [
+      {
+        id: 'kp1',
+        question: 'My simple pleasures...',
+        answer: 'Opening a fresh bag of Ethiopian beans on Saturday morning.'
+      }
+    ],
+    jobTitle: 'Studio Ceramicist',
+    company: 'Clay Works Collective',
+    education: 'CCA',
+    locationName: 'Castro, SF',
+    height: '5\'7"',
+    zodiac: 'Cancer ♋',
+    lifestyle: {
+      drinking: 'Socially 🍷',
+      smoking: 'Socially 🚬',
+      workout: 'Cycling 🚴'
+    },
+    lookingFor: 'Open to anything',
+    compatibilityScore: 89
   }
 ];
 

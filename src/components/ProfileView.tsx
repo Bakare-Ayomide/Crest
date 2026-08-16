@@ -7,6 +7,7 @@ interface ProfileViewProps {
   onUpdateUser: (updatedUser: Partial<UserProfile>) => void;
   userSettings: UserSettings;
   onOpenSettings: () => void;
+  onOpenDiscoveryPreferences?: () => void;
   onOpenSubscription: () => void;
   onStartVerification: () => void;
 }
@@ -16,6 +17,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onUpdateUser,
   userSettings,
   onOpenSettings,
+  onOpenDiscoveryPreferences,
   onOpenSubscription,
   onStartVerification
 }) => {
@@ -28,6 +30,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         userSettings={userSettings}
         onUpdateUser={onUpdateUser}
         onOpenSettings={onOpenSettings}
+        onOpenDiscoveryPreferences={onOpenDiscoveryPreferences}
         onOpenSubscription={onOpenSubscription}
         onStartVerification={onStartVerification}
       />

@@ -17,6 +17,7 @@ import {
   Edit3,
   Camera,
   Settings as SettingsIcon,
+  Sliders,
   ShieldCheck,
   Plus,
   Trash2,
@@ -50,6 +51,7 @@ export interface CanonicalProfileViewProps {
   userSettings?: UserSettings;
   onUpdateUser?: (updatedUser: Partial<UserProfile>) => void;
   onOpenSettings?: () => void;
+  onOpenDiscoveryPreferences?: () => void;
   onOpenSubscription?: () => void;
   onStartVerification?: () => void;
 }
@@ -71,6 +73,7 @@ export const CanonicalProfileView: React.FC<CanonicalProfileViewProps> = ({
   userSettings,
   onUpdateUser,
   onOpenSettings,
+  onOpenDiscoveryPreferences,
   onOpenSubscription,
   onStartVerification
 }) => {
@@ -202,6 +205,19 @@ export const CanonicalProfileView: React.FC<CanonicalProfileViewProps> = ({
               >
                 <Edit3 className="w-4 h-4" />
               </button>
+
+              {onOpenDiscoveryPreferences && (
+                <button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    onOpenDiscoveryPreferences();
+                  }}
+                  className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-[#E98BD0] transition-colors"
+                  title="Discovery Preferences"
+                >
+                  <Sliders className="w-4 h-4" />
+                </button>
+              )}
 
               {onOpenSettings && (
                 <button

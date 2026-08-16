@@ -7,6 +7,7 @@ interface SettingsViewProps {
   settings: UserSettings;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
   onClose: () => void;
+  onOpenDiscoveryPreferences?: () => void;
   isAdmin: boolean;
   setIsAdmin: (val: boolean) => void;
 }
@@ -15,6 +16,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onUpdateSettings,
   onClose,
+  onOpenDiscoveryPreferences,
   isAdmin,
   setIsAdmin
 }) => {
@@ -31,6 +33,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </button>
         <h3 className="font-extrabold text-base text-gray-900 dark:text-white">App Settings</h3>
       </div>
+
+      {/* Discovery Preferences Quick Entry */}
+      {onOpenDiscoveryPreferences && (
+        <button
+          onClick={() => { triggerHaptic('medium'); onOpenDiscoveryPreferences(); }}
+          className="w-full p-4 rounded-3xl bg-gradient-to-r from-[#FF4058]/15 via-rose-500/10 to-[#E98BD0]/15 border border-[#FF4058]/30 flex items-center justify-between text-left shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-gradient-to-br from-[#FF4058] to-[#E98BD0] text-white shadow-md">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-extrabold text-xs text-white group-hover:text-[#E98BD0] transition-colors">
+                Discovery & Matching Preferences
+              </p>
+              <p className="text-[11px] text-gray-400">
+                Location map, distance radius, age range & passions
+              </p>
+            </div>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-bold text-[#E98BD0]">
+            Edit
+          </span>
+        </button>
+      )}
 
       {/* Account Preferences */}
       <div className="p-4 rounded-3xl bg-white dark:bg-gray-800 shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">

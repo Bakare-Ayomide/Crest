@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
-import { Heart, X, MapPin, ChevronLeft, MoreHorizontal, Info, Sparkles, RotateCcw, Zap } from 'lucide-react';
+import { Heart, X, MapPin, ChevronLeft, SlidersHorizontal, Info, Sparkles, RotateCcw, Zap, Sliders, Filter } from 'lucide-react';
 import { UserProfile, SwipeDirection } from '../types';
 import { triggerHaptic } from '../lib/capacitor';
 import { CanonicalProfileView } from './CanonicalProfileView';
@@ -61,22 +61,88 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
     setCurrentIndex(prev => prev + 1);
   };
 
+  // END OF SWIPES SCREEN WITH PROMINENT PREFERENCES BUTTON
   if (!activeProfile || currentIndex >= profiles.length) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 text-white bg-[#101112] min-h-[80vh]">
-        <div className="w-20 h-20 rounded-full bg-[#E98BD0]/20 text-[#E98BD0] flex items-center justify-center shadow-inner">
-          <Sparkles className="w-10 h-10" />
+      <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full px-4 pt-1 pb-24 relative select-none bg-[#101112] text-white font-sans min-h-[85vh]">
+        {/* Top Header */}
+        <div className="flex items-center justify-between pt-1 pb-2">
+          <button
+            onClick={() => {
+              triggerHaptic('light');
+              if (canRewind && currentIndex > 0) {
+                onRewind();
+                setCurrentIndex(prev => Math.max(0, prev - 1));
+              }
+            }}
+            disabled={!canRewind && currentIndex === 0}
+            className={`w-12 h-12 rounded-[18px] bg-[#171819] flex items-center justify-center text-white shadow-md transition-colors ${
+              !canRewind && currentIndex === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#242526]'
+            }`}
+            title="Back / Rewind"
+          >
+            <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+          </button>
+
+          <h1 className="text-sm font-extrabold tracking-widest text-white uppercase font-sans">
+            FIND YOUR LOVE
+          </h1>
+
+          {/* Prominent Preferences Button in Header */}
+          <button
+            onClick={() => {
+              triggerHaptic('medium');
+              if (onOpenFilters) onOpenFilters();
+            }}
+            className="px-3.5 py-2.5 rounded-[18px] bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/50 hover:border-rose-400 text-rose-300 flex items-center gap-1.5 shadow-lg shadow-rose-500/10 active:scale-95 transition-all text-xs font-bold"
+            title="Discovery Preferences"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-pink-400" />
+            <span className="font-semibold tracking-wide">Filters</span>
+          </button>
         </div>
-        <h3 className="text-xl font-bold text-white">You've reached the end!</h3>
-        <p className="text-xs text-[#B8B8BA] max-w-xs leading-relaxed">
-          No more profiles nearby right now. Expand your location filters or rewind to review recent cards.
-        </p>
-        <button
-          onClick={() => { triggerHaptic('medium'); setCurrentIndex(0); }}
-          className="px-6 py-3 rounded-full bg-[#FF4058] text-white font-bold text-xs shadow-lg hover:scale-105 transition-transform"
-        >
-          Discover Again
-        </button>
+
+        {/* Center Card with Prominent Action Buttons */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-5 bg-[#171819] border border-white/10 rounded-[28px] my-4 shadow-2xl">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#FF4058]/20 to-[#E98BD0]/30 text-[#E98BD0] flex items-center justify-center shadow-inner ring-1 ring-white/10">
+            <Sparkles className="w-10 h-10 text-pink-400" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-xl font-bold text-white">You've reached the end!</h3>
+            <p className="text-xs text-[#B8B8BA] max-w-xs leading-relaxed">
+              No more profiles match your current search criteria right now. Adjust your location radius, age range, or demographic filters to unlock more singles.
+            </p>
+          </div>
+
+          {/* PROMINENT PREFERENCES CTA BUTTON */}
+          <div className="w-full space-y-2.5 pt-2">
+            <button
+              onClick={() => {
+                triggerHaptic('medium');
+                if (onOpenFilters) onOpenFilters();
+              }}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-rose-500 via-pink-500 to-[#FF4058] text-white font-extrabold text-sm shadow-xl shadow-rose-500/25 hover:opacity-95 active:scale-98 transition-all flex items-center justify-center gap-2.5"
+            >
+              <SlidersHorizontal className="w-5 h-5 stroke-[2.5]" />
+              <span>Adjust Discovery Preferences</span>
+            </button>
+
+            <button
+              onClick={() => {
+                triggerHaptic('light');
+                setCurrentIndex(0);
+              }}
+              className="w-full py-3 px-6 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4 text-gray-400" />
+              <span>Review Cards Again</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom spacing placeholder */}
+        <div className="h-10" />
       </div>
     );
   }
@@ -84,9 +150,9 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
   return (
     <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full px-4 pt-1 pb-24 relative select-none bg-[#101112] text-white font-sans">
       
-      {/* TOP HEADER — SPEC COMPLIANT */}
+      {/* TOP HEADER — WITH PROMINENT PREFERENCES BUTTON */}
       <div className="flex items-center justify-between pt-1 pb-2">
-        {/* Back Button */}
+        {/* Back / Rewind Button */}
         <button
           onClick={() => {
             triggerHaptic('light');
@@ -106,45 +172,60 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
           FIND YOUR LOVE
         </h1>
 
-        {/* Options Menu Button */}
+        {/* PROMINENT DISCOVERY PREFERENCES BUTTON */}
+        <button
+          onClick={() => {
+            triggerHaptic('medium');
+            if (onOpenFilters) onOpenFilters();
+          }}
+          className="px-3.5 py-2.5 rounded-[18px] bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/50 hover:border-rose-400 text-rose-300 flex items-center gap-1.5 shadow-lg shadow-rose-500/10 active:scale-95 transition-all text-xs font-bold"
+          title="Discovery Preferences"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-pink-400" />
+          <span className="font-semibold tracking-wide">Filters</span>
+        </button>
+      </div>
+
+      {/* DISCOVERY FILTERS & SHORTCUTS */}
+      <div className="flex items-center justify-between gap-2 my-2">
+        <div className="flex items-center gap-2">
+          {/* NEARBY Pill */}
+          <button
+            onClick={() => { triggerHaptic('light'); setSelectedSubTab('nearby'); }}
+            className={`px-4 py-2 rounded-[30px] text-xs font-bold flex items-center gap-1.5 transition-all ${
+              selectedSubTab === 'nearby'
+                ? 'bg-[#E98BD0] text-[#101112] shadow-md'
+                : 'bg-[#171819] text-white hover:bg-[#242526]'
+            }`}
+          >
+            <MapPin className={`w-3.5 h-3.5 ${selectedSubTab === 'nearby' ? 'text-[#101112]' : 'text-white'}`} />
+            <span className="uppercase tracking-wider text-[11px]">NEARBY</span>
+          </button>
+
+          {/* FOR YOU Pill (Selected State) */}
+          <button
+            onClick={() => { triggerHaptic('light'); setSelectedSubTab('foryou'); }}
+            className={`px-4 py-2 rounded-[30px] text-xs font-bold flex items-center gap-1.5 transition-all ${
+              selectedSubTab === 'foryou'
+                ? 'bg-[#E98BD0] text-[#101112] shadow-md'
+                : 'bg-[#171819] text-white hover:bg-[#242526]'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 fill-current ${selectedSubTab === 'foryou' ? 'text-[#101112]' : 'text-white'}`} />
+            <span className="uppercase tracking-wider text-[11px]">FOR YOU</span>
+          </button>
+        </div>
+
+        {/* Quick Preference shortcut pill */}
         <button
           onClick={() => {
             triggerHaptic('light');
             if (onOpenFilters) onOpenFilters();
           }}
-          className="w-12 h-12 rounded-[18px] bg-[#171819] flex items-center justify-center text-white shadow-md hover:bg-[#242526] transition-colors"
-          title="Discovery Filters"
+          className="p-2 rounded-full bg-[#171819] hover:bg-[#242526] text-gray-300 hover:text-white border border-white/10 transition-colors"
+          title="Open Preferences"
         >
-          <MoreHorizontal className="w-6 h-6" />
-        </button>
-      </div>
-
-      {/* DISCOVERY FILTERS — SPEC COMPLIANT */}
-      <div className="flex items-center justify-center gap-2.5 my-2">
-        {/* NEARBY Pill */}
-        <button
-          onClick={() => { triggerHaptic('light'); setSelectedSubTab('nearby'); }}
-          className={`px-5 py-2.5 rounded-[30px] text-xs font-bold flex items-center gap-2 transition-all ${
-            selectedSubTab === 'nearby'
-              ? 'bg-[#E98BD0] text-[#101112] shadow-md'
-              : 'bg-[#171819] text-white hover:bg-[#242526]'
-          }`}
-        >
-          <MapPin className={`w-3.5 h-3.5 ${selectedSubTab === 'nearby' ? 'text-[#101112]' : 'text-white'}`} />
-          <span className="uppercase tracking-wider text-[11px]">NEARBY</span>
-        </button>
-
-        {/* FOR YOU Pill (Selected State) */}
-        <button
-          onClick={() => { triggerHaptic('light'); setSelectedSubTab('foryou'); }}
-          className={`px-5 py-2.5 rounded-[30px] text-xs font-bold flex items-center gap-2 transition-all ${
-            selectedSubTab === 'foryou'
-              ? 'bg-[#E98BD0] text-[#101112] shadow-md'
-              : 'bg-[#171819] text-white hover:bg-[#242526]'
-          }`}
-        >
-          <Heart className={`w-3.5 h-3.5 fill-current ${selectedSubTab === 'foryou' ? 'text-[#101112]' : 'text-white'}`} />
-          <span className="uppercase tracking-wider text-[11px]">FOR YOU</span>
+          <Sliders className="w-4 h-4 text-[#E98BD0]" />
         </button>
       </div>
 

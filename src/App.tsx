@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, Match, Message, NotificationItem, FilterSettings, UserSettings, ReportTicket, VerificationRequest, SwipeDirection } from './types';
 import { CURRENT_USER, MOCK_PROFILES, MOCK_MATCHES, MOCK_NOTIFICATIONS, MOCK_REPORTS, MOCK_VERIFICATION_REQUESTS } from './data/mockData';
 import { Header, BottomNav } from './components/Navigation';
@@ -7,6 +7,7 @@ import { LikesView } from './components/LikesView';
 import { MatchesChatView } from './components/MatchesChatView';
 import { ProfileView } from './components/ProfileView';
 import { VerificationWizard } from './components/VerificationWizard';
+import { QuickPreferencesView } from './components/QuickPreferencesView';
 import { SearchFilterModal } from './components/SearchFilterModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { SettingsView } from './components/SettingsView';
@@ -15,6 +16,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { DeviceFrame } from './components/DeviceFrame';
 import { CanonicalProfileView } from './components/CanonicalProfileView';
 import { triggerHaptic, showNativeToast } from './lib/capacitor';
+import { calculateDistanceKm } from './lib/geo';
 import { Heart, MessageCircle, Sparkles, X, Send } from 'lucide-react';
 
 export default function App() {
@@ -50,13 +52,22 @@ export default function App() {
   });
 
   const [filters, setFilters] = useState<FilterSettings>({
+    locationName: 'San Francisco, CA',
+    locationCoords: { lat: 37.7749, lng: -122.4194 },
+    locationOnlyMode: false,
     ageRange: [18, 35],
     maxDistanceKm: 25,
     genderPreference: 'everyone',
     verifiedOnly: false,
     hasPhotosOnly: true,
-    lookingForFilter: 'All',
-    selectedPassions: []
+    lookingForFilter: ['Long-term relationship'],
+    selectedPassions: ['Specialty Coffee', 'Indie Music', 'Photography', 'Hiking & Outdoors'],
+    prioritizeCommonInterests: true,
+    lifestyleFilters: {
+      drinking: 'all',
+      smoking: 'never',
+      wantChildren: 'all'
+    }
   });
 
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -75,6 +86,85 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [userSettings.darkTheme]);
+
+  // Dynamically compute filtered discovery profiles based on live Quick Preferences
+  const filteredDiscoveryProfiles = useMemo(() => {
+    return profiles
+      .map(p => {
+        // Calculate distance relative to current filter location
+        let dist = p.distanceKm;
+        if (p.coordinates && filters.locationCoords) {
+          dist = calculateDistanceKm(
+            filters.locationCoords.lat,
+            filters.locationCoords.lng,
+            p.coordinates.lat,
+            p.coordinates.lng
+          );
+        }
+        return { ...p, distanceKm: dist };
+      })
+      .filter(p => {
+        // 1. Location only mode
+        if (filters.locationOnlyMode && p.distanceKm > filters.maxDistanceKm) {
+          return false;
+        }
+
+        // 2. Age Range
+        if (p.age < filters.ageRange[0] || p.age > filters.ageRange[1]) {
+          return false;
+        }
+
+        // 3. Gender preference
+        if (filters.genderPreference !== 'everyone') {
+          if (filters.genderPreference === 'women' && p.gender !== 'female') return false;
+          if (filters.genderPreference === 'men' && p.gender !== 'male') return false;
+          if (filters.genderPreference === 'nonbinary' && p.gender !== 'nonbinary' && p.gender !== 'other') return false;
+        }
+
+        // 4. Verified Only
+        if (filters.verifiedOnly && !p.verified) {
+          return false;
+        }
+
+        // 5. Has Multiple Photos
+        if (filters.hasPhotosOnly && p.photos.length <= 1) {
+          return false;
+        }
+
+        // 6. Looking For
+        if (filters.lookingForFilter) {
+          const lookingForList = Array.isArray(filters.lookingForFilter)
+            ? filters.lookingForFilter
+            : [filters.lookingForFilter];
+          if (!lookingForList.includes('Open to anything') && !lookingForList.includes('All')) {
+            const hasMatch = lookingForList.some(lf =>
+              lf.toLowerCase().includes(p.lookingFor.toLowerCase()) ||
+              p.lookingFor.toLowerCase().includes(lf.toLowerCase())
+            );
+            if (!hasMatch) return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        // Shared passions prioritization
+        if (filters.prioritizeCommonInterests && filters.selectedPassions && filters.selectedPassions.length > 0) {
+          const aShared = a.interests.filter(i =>
+            filters.selectedPassions?.some(sp =>
+              sp.toLowerCase().includes(i.toLowerCase()) || i.toLowerCase().includes(sp.toLowerCase())
+            )
+          ).length;
+          const bShared = b.interests.filter(i =>
+            filters.selectedPassions?.some(sp =>
+              sp.toLowerCase().includes(i.toLowerCase()) || i.toLowerCase().includes(sp.toLowerCase())
+            )
+          ).length;
+          if (bShared !== aShared) return bShared - aShared;
+        }
+        return a.distanceKm - b.distanceKm;
+      });
+  }, [profiles, filters]);
 
   // Handle Swipe Action
   const handleSwipe = (profile: UserProfile, direction: SwipeDirection) => {
@@ -241,6 +331,7 @@ export default function App() {
               settings={userSettings}
               onUpdateSettings={(newSet) => setUserSettings(prev => ({ ...prev, ...newSet }))}
               onClose={() => setShowSettingsView(false)}
+              onOpenDiscoveryPreferences={() => setShowFilterModal(true)}
               isAdmin={isAdmin}
               setIsAdmin={setIsAdmin}
             />
@@ -248,7 +339,7 @@ export default function App() {
             <>
               {activeTab === 'discover' && (
                 <DiscoverSwipe
-                  profiles={profiles}
+                  profiles={filteredDiscoveryProfiles}
                   onSwipe={handleSwipe}
                   onRewind={handleRewind}
                   canRewind={swipedStack.length > 0}
@@ -290,6 +381,7 @@ export default function App() {
                   onUpdateUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
                   userSettings={userSettings}
                   onOpenSettings={() => setShowSettingsView(true)}
+                  onOpenDiscoveryPreferences={() => setShowFilterModal(true)}
                   onOpenSubscription={() => setShowSubscriptionModal(true)}
                   onStartVerification={() => setShowVerificationWizard(true)}
                 />
@@ -384,12 +476,18 @@ export default function App() {
           />
         )}
 
+        {/* QUICK PREFERENCES FULL-SCREEN / DRAWER */}
         {showFilterModal && (
-          <SearchFilterModal
-            filters={filters}
-            onApplyFilters={(newF) => setFilters(newF)}
-            onClose={() => setShowFilterModal(false)}
-          />
+          <div className="fixed inset-0 z-50 bg-[#101112] overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-200">
+            <QuickPreferencesView
+              filters={filters}
+              userSettings={userSettings}
+              onUpdateFilters={(newF) => setFilters(newF)}
+              onUpdateUserSettings={(newSet) => setUserSettings(prev => ({ ...prev, ...newSet }))}
+              onClose={() => setShowFilterModal(false)}
+              isModal={true}
+            />
+          </div>
         )}
 
         {showNotificationsModal && (

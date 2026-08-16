@@ -31,6 +31,43 @@ async function startServer() {
     res.json({ status: "ok", service: "CREST Backend", time: new Date().toISOString() });
   });
 
+  // User preferences in-memory state
+  let userPreferencesStore = {
+    locationName: "San Francisco, CA",
+    locationCoords: { lat: 37.7749, lng: -122.4194 },
+    locationOnlyMode: true,
+    maxDistanceKm: 25,
+    ageRange: [21, 35],
+    genderPreference: "everyone",
+    lookingForFilter: ["Long-term relationship"],
+    selectedPassions: ["Specialty Coffee", "Indie Music", "Photography", "Hiking"],
+    prioritizeCommonInterests: true,
+    verifiedOnly: false,
+    hasPhotosOnly: true,
+    lifestyleFilters: {
+      drinking: "all",
+      smoking: "never",
+      wantChildren: "all"
+    },
+    updatedAt: new Date().toISOString()
+  };
+
+  // Get user preferences
+  app.get("/api/user/preferences", (req, res) => {
+    res.json({ success: true, preferences: userPreferencesStore });
+  });
+
+  // Save / update user preferences (debounced from client)
+  app.post("/api/user/preferences", (req, res) => {
+    const updates = req.body || {};
+    userPreferencesStore = {
+      ...userPreferencesStore,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    res.json({ success: true, preferences: userPreferencesStore, message: "Preferences synchronized." });
+  });
+
   // AI Bio Assistant endpoint
   app.post("/api/ai/bio", async (req, res) => {
     const { currentBio, interests, tone } = req.body || {};

@@ -34,11 +34,25 @@ export interface UserProfile {
     childrenCount?: string;
     lookingForGender?: string;
   };
-  lookingFor: 'Long-term relationship' | 'Short-term fun' | 'New friends' | 'Still figuring it out';
+  lookingFor:
+    | 'Long-term relationship'
+    | 'Relationship'
+    | 'Casual dating'
+    | 'Friendship'
+    | 'Marriage'
+    | 'Open to anything'
+    | 'Short-term fun'
+    | 'New friends'
+    | 'Still figuring it out'
+    | string;
   spotifyTrack?: {
     title: string;
     artist: string;
     albumCover: string;
+  };
+  coordinates?: {
+    lat: number;
+    lng: number;
   };
   compatibilityScore: number;
   compatibilityReason?: string;
@@ -156,13 +170,33 @@ export interface NotificationItem {
 }
 
 export interface FilterSettings {
-  ageRange: [number, number];
-  maxDistanceKm: number;
+  // Location
+  locationName: string;
+  locationCoords: { lat: number; lng: number };
+  locationOnlyMode: boolean; // Only show people within my selected area
+  maxDistanceKm: number; // 1 to 500 km
+  
+  // Demographics
+  ageRange: [number, number]; // 18 - 80
   genderPreference: 'everyone' | 'women' | 'men' | 'nonbinary';
+  
+  // Looking For (relationship intent)
+  lookingForFilter: string | string[]; // Relationships, Casual dating, Friendship, etc.
+  
+  // Shared Interests
+  selectedPassions: string[];
+  prioritizeCommonInterests: boolean;
+  
+  // Quality & Verification Filters
   verifiedOnly: boolean;
   hasPhotosOnly: boolean;
-  lookingForFilter: string;
-  selectedPassions: string[];
+  
+  // Lifestyle filters
+  lifestyleFilters?: {
+    drinking?: string;
+    smoking?: string;
+    wantChildren?: string;
+  };
 }
 
 export interface UserSettings {
