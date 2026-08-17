@@ -54,6 +54,7 @@ export interface CanonicalProfileViewProps {
   onOpenDiscoveryPreferences?: () => void;
   onOpenSubscription?: () => void;
   onStartVerification?: () => void;
+  onLogout?: () => void;
 }
 
 export const CanonicalProfileView: React.FC<CanonicalProfileViewProps> = ({
@@ -75,7 +76,8 @@ export const CanonicalProfileView: React.FC<CanonicalProfileViewProps> = ({
   onOpenSettings,
   onOpenDiscoveryPreferences,
   onOpenSubscription,
-  onStartVerification
+  onStartVerification,
+  onLogout
 }) => {
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
@@ -556,6 +558,19 @@ export const CanonicalProfileView: React.FC<CanonicalProfileViewProps> = ({
               >
                 <SettingsIcon className="w-4 h-4 text-gray-400" />
                 <span>Account & App Settings</span>
+              </button>
+            )}
+
+            {onLogout && (
+              <button
+                onClick={() => {
+                  triggerHaptic('medium');
+                  if (onClose) onClose();
+                  onLogout();
+                }}
+                className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
+              >
+                <span>Log Out of CREST</span>
               </button>
             )}
           </div>

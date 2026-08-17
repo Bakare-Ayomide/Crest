@@ -10,6 +10,7 @@ interface ProfileViewProps {
   onOpenDiscoveryPreferences?: () => void;
   onOpenSubscription: () => void;
   onStartVerification: () => void;
+  onLogout?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -19,7 +20,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenSettings,
   onOpenDiscoveryPreferences,
   onOpenSubscription,
-  onStartVerification
+  onStartVerification,
+  onLogout
 }) => {
   return (
     <div className="flex-1 max-w-md mx-auto w-full px-4 pt-2 pb-24">
@@ -33,6 +35,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         onOpenDiscoveryPreferences={onOpenDiscoveryPreferences}
         onOpenSubscription={onOpenSubscription}
         onStartVerification={onStartVerification}
+        onLogout={onLogout}
       />
     </div>
   );

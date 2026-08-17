@@ -15,15 +15,35 @@ import { SubscriptionModal } from './components/SubscriptionModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { DeviceFrame } from './components/DeviceFrame';
 import { CanonicalProfileView } from './components/CanonicalProfileView';
+import { AuthView } from './components/auth/AuthView';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { triggerHaptic, showNativeToast } from './lib/capacitor';
 import { calculateDistanceKm } from './lib/geo';
 import { Heart, MessageCircle, Sparkles, X, Send } from 'lucide-react';
 
 export default function App() {
+  // Authentication & Onboarding State — Default to 'unauthenticated' so user immediately sees the Welcome/Auth & Onboarding screen
+  const [authState, setAuthState] = useState<'authenticated' | 'unauthenticated' | 'onboarding'>(() => {
+    const saved = localStorage.getItem('crest_auth_session');
+    if (saved === 'authenticated') return 'authenticated';
+    if (saved === 'onboarding') return 'onboarding';
+    return 'unauthenticated';
+  });
+  const [tempOnboardData, setTempOnboardData] = useState<{ email?: string; name?: string }>({});
+
   const [activeTab, setActiveTab] = useState<'discover' | 'likes' | 'matches' | 'profile' | 'admin'>('discover');
   
   // State
-  const [currentUser, setCurrentUser] = useState<UserProfile>(CURRENT_USER);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('crest_user_profile');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.name) return { ...CURRENT_USER, ...parsed };
+      }
+    } catch (e) {}
+    return CURRENT_USER;
+  });
   const [profiles, setProfiles] = useState<UserProfile[]>(MOCK_PROFILES);
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
   const [activeMatch, setActiveMatch] = useState<Match | null>(null);
@@ -51,23 +71,32 @@ export default function App() {
     superLikesRemaining: 5
   });
 
-  const [filters, setFilters] = useState<FilterSettings>({
-    locationName: 'San Francisco, CA',
-    locationCoords: { lat: 37.7749, lng: -122.4194 },
-    locationOnlyMode: false,
-    ageRange: [18, 35],
-    maxDistanceKm: 25,
-    genderPreference: 'everyone',
-    verifiedOnly: false,
-    hasPhotosOnly: true,
-    lookingForFilter: ['Long-term relationship'],
-    selectedPassions: ['Specialty Coffee', 'Indie Music', 'Photography', 'Hiking & Outdoors'],
-    prioritizeCommonInterests: true,
-    lifestyleFilters: {
-      drinking: 'all',
-      smoking: 'never',
-      wantChildren: 'all'
-    }
+  const [filters, setFilters] = useState<FilterSettings>(() => {
+    try {
+      const saved = localStorage.getItem('crest_user_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed) return parsed;
+      }
+    } catch (e) {}
+    return {
+      locationName: 'San Francisco, CA',
+      locationCoords: { lat: 37.7749, lng: -122.4194 },
+      locationOnlyMode: false,
+      ageRange: [18, 35],
+      maxDistanceKm: 25,
+      genderPreference: 'everyone',
+      verifiedOnly: false,
+      hasPhotosOnly: true,
+      lookingForFilter: ['Long-term relationship'],
+      selectedPassions: ['Specialty Coffee', 'Indie Music', 'Photography', 'Hiking & Outdoors'],
+      prioritizeCommonInterests: true,
+      lifestyleFilters: {
+        drinking: 'all',
+        smoking: 'never',
+        wantChildren: 'all'
+      }
+    };
   });
 
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -299,8 +328,84 @@ export default function App() {
     showNativeToast(`Verification ${status.toUpperCase()}`);
   };
 
+  // Auth & Onboarding handlers
+  const handleLoginSuccess = (userProfile?: UserProfile) => {
+    if (userProfile) {
+      setCurrentUser(userProfile);
+      localStorage.setItem('crest_user_profile', JSON.stringify(userProfile));
+    }
+    localStorage.setItem('crest_auth_session', 'authenticated');
+    setAuthState('authenticated');
+    showNativeToast('Welcome back to CREST');
+  };
+
+  const handleStartOnboarding = (tempData: { email: string; name?: string }) => {
+    setTempOnboardData(tempData);
+    localStorage.setItem('crest_auth_session', 'onboarding');
+    setAuthState('onboarding');
+  };
+
+  const handleCompleteOnboarding = (userProfileUpdates: Partial<UserProfile>, filterUpdates: Partial<FilterSettings>) => {
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      ...userProfileUpdates,
+      id: currentUser.id || 'user_me'
+    };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('crest_user_profile', JSON.stringify(updatedUser));
+
+    const updatedFilters: FilterSettings = {
+      ...filters,
+      ...filterUpdates
+    };
+    setFilters(updatedFilters);
+    localStorage.setItem('crest_user_filters', JSON.stringify(updatedFilters));
+
+    localStorage.setItem('crest_auth_session', 'authenticated');
+    setAuthState('authenticated');
+    setActiveTab('discover');
+    showNativeToast(`Welcome to CREST, ${updatedUser.name}!`);
+  };
+
+  const handleLogout = () => {
+    localStorage.setItem('crest_auth_session', 'unauthenticated');
+    setAuthState('unauthenticated');
+    setActiveMatch(null);
+    setShowSettingsView(false);
+    setGlobalViewProfile(null);
+    setShowFilterModal(false);
+    setShowNotificationsModal(false);
+    setShowSubscriptionModal(false);
+    setShowVerificationWizard(false);
+    triggerHaptic('medium');
+  };
+
   const unreadNotificationsCount = notifications.filter(n => !n.read).length;
   const unreadMessagesCount = matches.reduce((acc, m) => acc + m.unreadCount, 0);
+
+  // Unauthenticated screen
+  if (authState === 'unauthenticated') {
+    return (
+      <DeviceFrame enabled={userSettings.capacitorNativeMode}>
+        <AuthView
+          onLoginSuccess={handleLoginSuccess}
+          onStartOnboarding={handleStartOnboarding}
+        />
+      </DeviceFrame>
+    );
+  }
+
+  // First-time Onboarding flow
+  if (authState === 'onboarding') {
+    return (
+      <DeviceFrame enabled={userSettings.capacitorNativeMode}>
+        <OnboardingFlow
+          initialData={tempOnboardData}
+          onComplete={handleCompleteOnboarding}
+        />
+      </DeviceFrame>
+    );
+  }
 
   return (
     <DeviceFrame enabled={userSettings.capacitorNativeMode}>
@@ -334,6 +439,7 @@ export default function App() {
               onOpenDiscoveryPreferences={() => setShowFilterModal(true)}
               isAdmin={isAdmin}
               setIsAdmin={setIsAdmin}
+              onLogout={handleLogout}
             />
           ) : (
             <>
@@ -384,6 +490,7 @@ export default function App() {
                   onOpenDiscoveryPreferences={() => setShowFilterModal(true)}
                   onOpenSubscription={() => setShowSubscriptionModal(true)}
                   onStartVerification={() => setShowVerificationWizard(true)}
+                  onLogout={handleLogout}
                 />
               )}
 
@@ -567,6 +674,7 @@ export default function App() {
               setGlobalViewProfile(null);
               setShowVerificationWizard(true);
             }}
+            onLogout={handleLogout}
           />
         )}
 

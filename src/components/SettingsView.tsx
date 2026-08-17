@@ -10,6 +10,7 @@ interface SettingsViewProps {
   onOpenDiscoveryPreferences?: () => void;
   isAdmin: boolean;
   setIsAdmin: (val: boolean) => void;
+  onLogout?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -18,7 +19,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onClose,
   onOpenDiscoveryPreferences,
   isAdmin,
-  setIsAdmin
+  setIsAdmin,
+  onLogout
 }) => {
   return (
     <div className="flex-1 max-w-md mx-auto w-full px-4 pt-3 pb-24 space-y-5">
@@ -190,7 +192,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <button
           onClick={() => {
             triggerHaptic('heavy');
-            showNativeToast('Logged out session');
+            showNativeToast('Logged out of CREST');
+            if (onLogout) {
+              onLogout();
+            }
           }}
           className="w-full py-3.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 border border-rose-200 dark:border-rose-900"
         >
