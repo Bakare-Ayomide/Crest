@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, VolumeX, Minimize2, Maximize2, ShieldCheck, RefreshCw, AlertCircle, ArrowLeftRight, Check } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Volume2, VolumeX, Minimize2, Maximize2, ShieldCheck, RefreshCw } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { triggerHaptic, showNativeToast } from '../../lib/capacitor';
 
@@ -25,175 +25,57 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [micLevel, setMicLevel] = useState<number>(0);
-  const [isSwappedView, setIsSwappedView] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const micAnalyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const ringToneOscRef = useRef<any>(null);
 
-  // Sound generator for call ringtone & audio feedback
-  const playRingtone = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      audioContextRef.current = ctx;
-
-      const playToneBeep = () => {
-        if (ctx.state === 'closed') return;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.setValueAtTime(480, ctx.currentTime + 0.1);
-        
-        gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 1.2);
-      };
-
-      playToneBeep();
-      const ringInterval = setInterval(playToneBeep, 2400);
-      ringToneOscRef.current = ringInterval;
-    } catch {}
-  };
-
-  const stopRingtone = () => {
-    if (ringToneOscRef.current) {
-      clearInterval(ringToneOscRef.current);
-      ringToneOscRef.current = null;
-    }
-  };
-
-  // Play connection sound
-  const playConnectedChime = () => {
-    try {
-      const ctx = audioContextRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (ctx.state === 'suspended') ctx.resume();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15); // E5
-      osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.3); // G5
-      
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.6);
-    } catch {}
-  };
-
-  // Initialize camera and microphone
+  // Initialize camera/mic MediaStream
   useEffect(() => {
     let active = true;
 
     async function initMedia() {
-      setCameraError(null);
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const constraints: MediaStreamConstraints = {
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
-            },
-            video: callType === 'video' ? {
-              facingMode: cameraFacing,
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            } : false
+          const constraints = {
+            audio: true,
+            video: callType === 'video' ? { facingMode: cameraFacing } : false
           };
-
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          if (!active) {
-            stream.getTracks().forEach(t => t.stop());
-            return;
-          }
-
-          localStreamRef.current = stream;
-
-          if (localVideoRef.current && callType === 'video') {
-            localVideoRef.current.srcObject = stream;
-            localVideoRef.current.play().catch(() => {});
-          }
-
-          // Live audio meter analysis
-          try {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-            if (AudioCtx) {
-              const ctx = audioContextRef.current || new AudioCtx();
-              audioContextRef.current = ctx;
-              const source = ctx.createMediaStreamSource(stream);
-              const analyser = ctx.createAnalyser();
-              analyser.fftSize = 32;
-              analyser.smoothingTimeConstant = 0.5;
-              source.connect(analyser);
-              micAnalyserRef.current = analyser;
-
-              const monitorAudioLevel = () => {
-                if (micAnalyserRef.current && !isMuted) {
-                  const data = new Uint8Array(micAnalyserRef.current.frequencyBinCount);
-                  micAnalyserRef.current.getByteFrequencyData(data);
-                  let sum = 0;
-                  for (let i = 0; i < data.length; i++) sum += data[i];
-                  const avg = sum / data.length;
-                  setMicLevel(Math.min(100, Math.round((avg / 128) * 100)));
-                } else {
-                  setMicLevel(0);
-                }
-                animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
-              };
-              monitorAudioLevel();
+          if (active) {
+            localStreamRef.current = stream;
+            if (localVideoRef.current && callType === 'video') {
+              localVideoRef.current.srcObject = stream;
             }
-          } catch {}
+          }
         }
-      } catch (err: any) {
-        console.warn('Camera/Mic permission warning:', err);
-        setCameraError(err.message || 'Camera or microphone access denied');
+      } catch (err) {
+        console.warn('Could not access camera/mic stream:', err);
       }
     }
 
     initMedia();
 
-    // Ringing state simulation
+    // If outgoing call, simulate match picking up after 2.5 seconds
     if (!isIncoming) {
-      playRingtone();
       const ringTimer = setTimeout(() => {
         if (active) {
-          stopRingtone();
-          playConnectedChime();
           setCallState('connected');
           triggerHaptic('success');
+          showNativeToast(`Connected with ${user.name}`);
         }
       }, 2500);
 
       return () => {
         active = false;
         clearTimeout(ringTimer);
-        stopRingtone();
       };
     }
 
     return () => {
       active = false;
-      stopRingtone();
     };
-  }, [callType, cameraFacing]);
+  }, [callType, isIncoming, cameraFacing]);
 
   // Duration timer when connected
   useEffect(() => {
@@ -207,42 +89,35 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
     };
   }, [callState]);
 
-  // Cleanup on unmount
+  // Cleanup stream on unmount
   useEffect(() => {
     return () => {
-      stopRingtone();
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop());
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        try { audioContextRef.current.close(); } catch {}
       }
     };
   }, []);
 
   const handleToggleMute = () => {
     triggerHaptic('light');
-    const newMuteState = !isMuted;
     if (localStreamRef.current) {
       const audioTracks = localStreamRef.current.getAudioTracks();
       audioTracks.forEach(t => {
-        t.enabled = !newMuteState;
+        t.enabled = isMuted;
       });
     }
-    setIsMuted(newMuteState);
+    setIsMuted(!isMuted);
   };
 
   const handleToggleVideo = () => {
     triggerHaptic('light');
-    const nextVideoState = !isVideoEnabled;
     if (localStreamRef.current) {
       const videoTracks = localStreamRef.current.getVideoTracks();
       videoTracks.forEach(t => {
-        t.enabled = nextVideoState;
+        t.enabled = !isVideoEnabled;
       });
     }
-    setIsVideoEnabled(nextVideoState);
+    setIsVideoEnabled(!isVideoEnabled);
   };
 
   const handleFlipCamera = async () => {
@@ -255,32 +130,23 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { facingMode: newFacing }
       });
       localStreamRef.current = newStream;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = newStream;
-        localVideoRef.current.play().catch(() => {});
       }
     } catch (e) {
       console.warn('Cannot flip camera:', e);
     }
   };
 
-  const handleToggleSpeaker = () => {
-    triggerHaptic('light');
-    setIsSpeakerOn(prev => !prev);
-  };
-
   const handleAcceptCall = () => {
-    stopRingtone();
-    playConnectedChime();
     triggerHaptic('success');
     setCallState('connected');
   };
 
   const handleDeclineCall = () => {
-    stopRingtone();
     triggerHaptic('heavy');
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => t.stop());
@@ -289,7 +155,6 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
   };
 
   const handleHangUp = () => {
-    stopRingtone();
     triggerHaptic('heavy');
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(t => t.stop());
@@ -306,7 +171,7 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
   // FLOATING MINIMIZED WIDGET (Picture-in-picture)
   if (isMinimized) {
     return (
-      <div className="fixed bottom-24 right-4 z-50 bg-[#141517] border border-rose-500/40 rounded-3xl p-3 shadow-2xl flex items-center gap-3 animate-in fade-in text-white backdrop-blur-lg">
+      <div className="fixed bottom-24 right-4 z-50 bg-[#141517] border border-rose-500/40 rounded-3xl p-3 shadow-2xl flex items-center gap-3 animate-in fade-in text-white">
         <div className="relative">
           <img src={user.photos[0]} alt="" className="w-11 h-11 rounded-full object-cover ring-2 ring-rose-500 animate-pulse" />
           <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-black" />
@@ -337,145 +202,87 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
 
   // FULLSCREEN CALL INTERFACE
   return (
-    <div className="fixed inset-0 z-50 bg-[#0c0d0e] flex flex-col justify-between p-4 sm:p-6 text-white select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-[#0d0e10] flex flex-col justify-between p-6 text-white select-none animate-in fade-in duration-200">
       
       {/* Top Header Bar */}
       <div className="flex items-center justify-between z-20">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-xs font-semibold text-gray-200 shadow-md">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-xs font-semibold text-gray-200">
           <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>HD Encrypted Call</span>
-          {callState === 'connected' && (
-            <span className="ml-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">
-              {formatTimer(duration)}
-            </span>
-          )}
+          <span>CREST HD End-to-End Encrypted</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Audio Output Indicator */}
-          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-gray-300">
-            <Volume2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>{isSpeakerOn ? 'Speakerphone' : 'Earpiece'}</span>
-          </div>
-
-          <button
-            onClick={() => {
-              setIsMinimized(true);
-              onMinimize?.();
-            }}
-            className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-gray-200 transition-colors shadow-md"
-            title="Minimize call"
-          >
-            <Minimize2 className="w-5 h-5" />
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setIsMinimized(true);
+            onMinimize?.();
+          }}
+          className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-gray-200 transition-colors"
+          title="Minimize call"
+        >
+          <Minimize2 className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Main Center Area */}
-      <div className="flex-1 flex flex-col items-center justify-center my-4 relative w-full">
+      <div className="flex-1 flex flex-col items-center justify-center my-6 relative">
         {callType === 'video' && isVideoEnabled ? (
-          <div className="relative w-full max-w-md h-[460px] sm:h-[500px] rounded-[32px] overflow-hidden bg-gray-900 shadow-2xl border border-white/15">
-            {/* Primary Display: Remote Video or Local Video if swapped */}
-            {!isSwappedView ? (
-              <>
-                <img
-                  src={user.photos[0]}
-                  alt={user.name}
-                  className="w-full h-full object-cover filter brightness-95"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 pointer-events-none" />
-                
-                {/* Remote Participant Banner */}
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold drop-shadow-md">{user.name}</h3>
-                    <p className="text-xs text-emerald-400 font-medium">
-                      {callState === 'connected' ? `Live • HD 1080p` : 'Connecting video...'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="text-[10px] text-gray-200 font-mono">Connected</span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              /* User Camera in Primary Feed */
-              <div className="w-full h-full relative bg-black">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover transform scale-x-[-1]"
-                />
-                <div className="absolute bottom-4 left-4 text-xs font-semibold bg-black/60 px-3 py-1 rounded-full border border-white/10">
-                  You (Live Camera)
-                </div>
+          <div className="relative w-full max-w-sm h-96 rounded-3xl overflow-hidden bg-gray-900 shadow-2xl border border-white/10">
+            {/* Simulated Remote Video Feed (Photo with cinematic ambient lighting) */}
+            <img
+              src={user.photos[0]}
+              alt={user.name}
+              className="w-full h-full object-cover filter brightness-95"
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+
+            {/* Remote Caller Name Banner */}
+            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">{user.name}</h3>
+                <p className="text-xs text-emerald-400 font-medium">
+                  {callState === 'connected' ? `Live • ${formatTimer(duration)}` : 'Connecting video...'}
+                </p>
               </div>
-            )}
-
-            {/* Picture-in-Picture Preview Window */}
-            <div
-              onClick={() => setIsSwappedView(!isSwappedView)}
-              className="absolute top-4 right-4 w-28 h-36 sm:w-32 sm:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/40 bg-black cursor-pointer group hover:scale-105 transition-all"
-              title="Click to swap main view"
-            >
-              {isSwappedView ? (
-                <img src={user.photos[0]} alt={user.name} className="w-full h-full object-cover" />
-              ) : (
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover transform scale-x-[-1]"
-                />
-              )}
-
-              {/* Pip overlay controls */}
-              <div className="absolute bottom-1 right-1 flex items-center gap-1">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFlipCamera();
-                  }}
-                  className="p-1.5 bg-black/70 hover:bg-black/90 rounded-lg text-white backdrop-blur-sm"
-                  title="Flip camera"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* View swap indicator badge */}
-              <div className="absolute top-1 left-1 p-1 bg-black/60 rounded-md text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowLeftRight className="w-3 h-3" />
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[10px] text-gray-300 font-mono">1080p</span>
               </div>
             </div>
 
-            {/* Live Mic Activity Ring for User */}
-            {!isMuted && micLevel > 15 && (
-              <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-emerald-500/40 text-[11px] text-emerald-300">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Speaking</span>
-              </div>
-            )}
+            {/* Local Video Picture-in-Picture Preview */}
+            <div className="absolute top-4 right-4 w-28 h-36 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/30 bg-black">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover transform scale-x-[-1]"
+              />
+              <button
+                onClick={handleFlipCamera}
+                className="absolute bottom-1 right-1 p-1 bg-black/60 rounded-lg text-white hover:bg-black/80"
+                title="Flip Camera"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         ) : (
-          /* Voice Call / Video Off Centerpiece */
-          <div className="text-center space-y-6 max-w-sm w-full">
+          /* Voice Call Centerpiece */
+          <div className="text-center space-y-6">
             <div className="relative inline-block">
               <img
                 src={user.photos[0]}
                 alt={user.name}
-                className="w-32 h-32 sm:w-36 sm:h-36 rounded-full object-cover ring-4 ring-rose-500 shadow-2xl mx-auto"
+                className="w-32 h-32 rounded-full object-cover ring-4 ring-rose-500 shadow-2xl mx-auto"
               />
               {callState === 'ringing' && (
-                <div className="absolute -inset-4 rounded-full border-2 border-rose-500/40 animate-ping pointer-events-none" />
+                <div className="absolute -inset-3 rounded-full border-2 border-rose-500/50 animate-ping" />
               )}
               {callState === 'connected' && (
-                <div className="absolute bottom-1 right-1 w-7 h-7 bg-emerald-500 rounded-full ring-4 ring-[#0c0d0e] flex items-center justify-center shadow-lg">
-                  <Check className="w-4 h-4 text-white stroke-[3]" />
+                <div className="absolute bottom-1 right-1 w-6 h-6 bg-emerald-500 rounded-full ring-4 ring-[#0d0e10] flex items-center justify-center">
+                  <span className="w-2 h-2 bg-white rounded-full" />
                 </div>
               )}
             </div>
@@ -489,42 +296,28 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
               </p>
             </div>
 
-            {/* Live Audio Reactive Visualizer Bars */}
+            {/* Ambient Waveform visualizer when connected */}
             {callState === 'connected' && (
-              <div className="flex items-center justify-center gap-1.5 h-12 py-2">
-                {[35, 65, 95, 45, 80, 55, 75, 100, 60, 50, 90, 40].map((lvl, i) => {
-                  const dynamicHeight = isMuted ? 15 : Math.max(20, Math.min(100, (lvl * (0.6 + (micLevel / 150)))));
-                  return (
-                    <div
-                      key={i}
-                      className="w-1.5 bg-gradient-to-t from-rose-500 to-pink-400 rounded-full transition-all duration-75"
-                      style={{ height: `${dynamicHeight}%` }}
-                    />
-                  );
-                })}
+              <div className="flex items-center justify-center gap-1.5 h-10">
+                {[30, 65, 95, 40, 80, 50, 75, 100, 60, 45, 90, 35].map((lvl, i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 bg-gradient-to-t from-rose-500 to-pink-400 rounded-full animate-pulse"
+                    style={{
+                      height: `${lvl}%`,
+                      animationDelay: `${i * 0.1}s`,
+                      animationDuration: '0.8s'
+                    }}
+                  />
+                ))}
               </div>
             )}
-
-            {isMuted && (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/30">
-                <MicOff className="w-3.5 h-3.5" />
-                <span>Your microphone is muted</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Camera or Mic warning banner if restricted */}
-        {cameraError && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-200 text-xs">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>{cameraError}</span>
           </div>
         )}
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-md mx-auto z-20 pb-2">
+      <div className="w-full max-w-sm mx-auto z-20">
         {callState === 'ringing' && isIncoming ? (
           <div className="flex items-center justify-around gap-6 py-4">
             <button
@@ -543,27 +336,24 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
             </button>
           </div>
         ) : (
-          <div className="bg-[#181a1e]/95 backdrop-blur-2xl border border-white/10 rounded-3xl p-3 sm:p-4 flex items-center justify-around gap-2 shadow-2xl">
-            {/* Mic Toggle with level indicator */}
+          <div className="bg-[#181a1d]/90 backdrop-blur-xl border border-white/10 rounded-3xl p-4 flex items-center justify-around gap-2 shadow-2xl">
+            {/* Mic Toggle */}
             <button
               onClick={handleToggleMute}
-              className={`p-3.5 rounded-2xl transition-all relative ${
-                isMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 hover:bg-white/20 text-white'
+              className={`p-3.5 rounded-2xl transition-colors ${
+                isMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
               title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
             >
               {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-              {!isMuted && micLevel > 20 && (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              )}
             </button>
 
             {/* Video Toggle */}
             {callType === 'video' && (
               <button
                 onClick={handleToggleVideo}
-                className={`p-3.5 rounded-2xl transition-all ${
-                  !isVideoEnabled ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/10 hover:bg-white/20 text-white'
+                className={`p-3.5 rounded-2xl transition-colors ${
+                  !isVideoEnabled ? 'bg-red-500/20 text-red-400' : 'bg-white/10 hover:bg-white/20 text-white'
                 }`}
                 title={isVideoEnabled ? 'Turn camera off' : 'Turn camera on'}
               >
@@ -571,24 +361,13 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
               </button>
             )}
 
-            {/* Flip Camera Toggle (if video active) */}
-            {callType === 'video' && isVideoEnabled && (
-              <button
-                onClick={handleFlipCamera}
-                className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all active:rotate-180 duration-300"
-                title="Flip Camera front/back"
-              >
-                <RefreshCw className="w-6 h-6" />
-              </button>
-            )}
-
             {/* Speaker Toggle */}
             <button
-              onClick={handleToggleSpeaker}
-              className={`p-3.5 rounded-2xl transition-all ${
-                !isSpeakerOn ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/10 hover:bg-white/20 text-white'
+              onClick={() => setIsSpeakerOn(!isSpeakerOn)}
+              className={`p-3.5 rounded-2xl transition-colors ${
+                !isSpeakerOn ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
-              title={isSpeakerOn ? 'Switch to Earpiece' : 'Switch to Speakerphone'}
+              title={isSpeakerOn ? 'Speaker On' : 'Earpiece'}
             >
               {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
             </button>
@@ -596,7 +375,7 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
             {/* End Call Button */}
             <button
               onClick={handleHangUp}
-              className="p-4 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white shadow-xl shadow-red-600/30 hover:scale-105 active:scale-95 transition-transform"
+              className="p-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30 hover:scale-105 active:scale-95 transition-transform"
               title="End call"
             >
               <PhoneOff className="w-6 h-6" />
@@ -607,4 +386,3 @@ export const ActiveCallModal: React.FC<ActiveCallModalProps> = ({
     </div>
   );
 };
-

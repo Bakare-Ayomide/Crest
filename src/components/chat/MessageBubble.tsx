@@ -183,19 +183,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     setAudioSpeed(nextSpeed);
   };
 
-  const handleScrubWaveform = (barIndex: number, totalBars: number) => {
-    triggerHaptic('light');
-    const targetPercent = (barIndex / (totalBars - 1)) * 100;
-    setAudioProgress(targetPercent);
-
-    if (audioRef.current && audioRef.current.duration) {
-      audioRef.current.currentTime = (targetPercent / 100) * audioRef.current.duration;
-      if (!isPlayingAudio) {
-        audioRef.current.play().then(() => setIsPlayingAudio(true)).catch(() => {});
-      }
-    }
-  };
-
   // Render Highlighted Search Text
   const renderFormattedText = (text: string) => {
     if (!searchHighlight || !text) return text;
@@ -345,21 +332,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
               <div className="flex-1">
                 {/* Waveform Scrubber */}
-                <div className="flex items-center gap-0.5 h-7 cursor-pointer group py-1" title="Click to seek">
-                  {((message.audioWaveform && message.audioWaveform.length > 0)
-                    ? message.audioWaveform
-                    : [30, 50, 80, 40, 95, 60, 45, 70, 85, 40, 65, 50, 75, 90, 30]
-                  ).map((lvl, i, arr) => (
+                <div className="flex items-center gap-0.5 h-7">
+                  {(message.audioWaveform || [30, 50, 80, 40, 95, 60, 45, 70, 85, 40, 65, 50, 75, 90, 30]).map((lvl, i) => (
                     <div
                       key={i}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleScrubWaveform(i, arr.length);
-                      }}
-                      className={`w-1 rounded-full transition-all duration-100 hover:scale-y-125 cursor-pointer ${
+                      className={`w-1 rounded-full transition-all duration-150 ${
                         isMe
-                          ? (i / arr.length) * 100 <= audioProgress ? 'bg-white' : 'bg-white/40'
-                          : (i / arr.length) * 100 <= audioProgress ? 'bg-rose-500' : 'bg-white/25'
+                          ? (i / 15) * 100 <= audioProgress ? 'bg-white' : 'bg-white/40'
+                          : (i / 15) * 100 <= audioProgress ? 'bg-rose-500' : 'bg-white/20'
                       }`}
                       style={{ height: `${Math.max(20, lvl)}%` }}
                     />
