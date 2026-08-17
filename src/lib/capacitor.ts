@@ -14,16 +14,8 @@ export const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'success' | '
   }
 };
 
-export const showNativeToast = (message: string) => {
-  const toastEl = document.createElement('div');
-  toastEl.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl backdrop-blur-md z-50 animate-bounce pointer-events-none flex items-center gap-2 border border-white/10';
-  toastEl.innerHTML = `<span>⚡ Native Event:</span> <span>${message}</span>`;
-  document.body.appendChild(toastEl);
-  setTimeout(() => {
-    toastEl.style.opacity = '0';
-    toastEl.style.transition = 'opacity 0.4s ease';
-    setTimeout(() => toastEl.remove(), 400);
-  }, 2200);
+export const showNativeToast = (_message: string) => {
+  // Onscreen native event toast removed as requested
 };
 
 export const nativeShare = async (title: string, text: string, url: string) => {

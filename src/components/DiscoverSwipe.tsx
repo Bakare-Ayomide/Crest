@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
-import { Heart, X, MapPin, ChevronLeft, MoreHorizontal, Info, Sparkles, RotateCcw, Zap } from 'lucide-react';
+import { Heart, X, MapPin, MoreHorizontal, Info, Sparkles, RotateCcw, Zap } from 'lucide-react';
 import { UserProfile, SwipeDirection } from '../types';
 import { triggerHaptic } from '../lib/capacitor';
 import { CanonicalProfileView } from './CanonicalProfileView';
@@ -84,26 +84,11 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
   return (
     <div className="flex-1 flex flex-col justify-between max-w-md mx-auto w-full px-4 pt-1 pb-24 relative select-none bg-[#101112] text-white font-sans">
       
-      {/* TOP HEADER — SPEC COMPLIANT */}
+      {/* TOP HEADER */}
       <div className="flex items-center justify-between pt-1 pb-2">
-        {/* Back Button */}
-        <button
-          onClick={() => {
-            triggerHaptic('light');
-            if (canRewind && currentIndex > 0) {
-              onRewind();
-              setCurrentIndex(prev => Math.max(0, prev - 1));
-            }
-          }}
-          className="w-12 h-12 rounded-[18px] bg-[#171819] flex items-center justify-center text-white shadow-md hover:bg-[#242526] transition-colors"
-          title="Back / Rewind"
-        >
-          <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
-        </button>
-
-        {/* Header Title */}
-        <h1 className="text-sm font-extrabold tracking-widest text-white uppercase font-sans">
-          FIND YOUR LOVE
+        {/* Header Title / Brand */}
+        <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 bg-clip-text text-transparent font-sans uppercase">
+          CREST
         </h1>
 
         {/* Options Menu Button */}

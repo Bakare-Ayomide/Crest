@@ -497,8 +497,9 @@ export default function App() {
             onClose={() => setShowNotificationsModal(false)}
             onSelectNotification={(item) => {
               setShowNotificationsModal(false);
-              const relatedProfile = profiles.find(p => p.id === item.userId || p.name === item.userName) ||
-                                     matches.find(m => m.user.id === item.userId || m.user.name === item.userName)?.user;
+              const targetId = item.profileId || (item as any).userId;
+              const relatedProfile = profiles.find(p => p.id === targetId) ||
+                                     matches.find(m => m.user.id === targetId)?.user;
               if (relatedProfile) {
                 setGlobalViewProfile(relatedProfile);
                 return;

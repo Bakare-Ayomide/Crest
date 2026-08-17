@@ -59,6 +59,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Audio Playback state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [audioProgress, setAudioProgress] = useState(0);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
   const [audioSpeed, setAudioSpeed] = useState<1 | 1.5 | 2>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthRef = useRef<VoiceNoteSynthesizer | null>(null);
@@ -74,6 +75,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         
         audio.ontimeupdate = () => {
           if (audioRef.current && audioRef.current.duration) {
+            setCurrentPlaybackTime(audioRef.current.currentTime);
             setAudioProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
           }
         };
@@ -81,10 +83,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         audio.onended = () => {
           setIsPlayingAudio(false);
           setAudioProgress(0);
+          setCurrentPlaybackTime(0);
         };
 
         audio.onerror = () => {
-          // Fallback if media loading fails
           audioRef.current = null;
         };
 
@@ -135,7 +137,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       audioRef.current.play().then(() => {
         setIsPlayingAudio(true);
       }).catch(() => {
-        // If playback failed, use tone synthesizer
         playWithSynthesizer();
       });
     } else {
@@ -143,20 +144,72 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  const playWithSynthesizer = () => {
+  const parseDurationInSeconds = (durationStr?: string): number => {
+    if (!durationStr) return 3;
+    const parts = durationStr.split(':');
+    if (parts.length === 2) {
+      const min = parseInt(parts[0], 10) || 0;
+      const sec = parseInt(parts[1], 10) || 0;
+      return Math.max(1, min * 60 + sec);
+    }
+    return 3;
+  };
+
+  const playWithSynthesizer = (startPercent = 0) => {
     if (!synthRef.current) {
       synthRef.current = new VoiceNoteSynthesizer();
     }
     setIsPlayingAudio(true);
-    const duration = message.audioDuration ? parseInt(message.audioDuration.split(':')[1] || '3', 10) : 3;
+    const totalDuration = parseDurationInSeconds(message.audioDuration);
+    const startOffset = (startPercent / 100) * totalDuration;
+
     synthRef.current.play(
-      Math.max(2, duration),
-      (pct) => setAudioProgress(pct),
+      totalDuration,
+      (pct) => {
+        setAudioProgress(pct);
+        setCurrentPlaybackTime((pct / 100) * totalDuration);
+      },
       () => {
         setIsPlayingAudio(false);
         setAudioProgress(0);
-      }
+        setCurrentPlaybackTime(0);
+      },
+      startOffset
     );
+  };
+
+  const handleSeekAudio = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    triggerHaptic('light');
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const seekPercent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+
+    setAudioProgress(seekPercent);
+
+    if (audioRef.current && audioRef.current.duration) {
+      audioRef.current.currentTime = (seekPercent / 100) * audioRef.current.duration;
+      setCurrentPlaybackTime(audioRef.current.currentTime);
+      if (!isPlayingAudio) {
+        audioRef.current.play().then(() => setIsPlayingAudio(true)).catch(() => {});
+      }
+    } else {
+      const totalSec = parseDurationInSeconds(message.audioDuration);
+      setCurrentPlaybackTime((seekPercent / 100) * totalSec);
+      if (isPlayingAudio) {
+        playWithSynthesizer(seekPercent);
+      }
+    }
+  };
+
+  const formatPlaybackTime = (currentSec: number, totalDurationStr?: string) => {
+    const min = Math.floor(currentSec / 60);
+    const sec = Math.floor(currentSec % 60);
+    const curFormatted = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    if (!isPlayingAudio && audioProgress === 0) {
+      return totalDurationStr || '0:14';
+    }
+    return `${curFormatted} / ${totalDurationStr || '0:14'}`;
   };
 
   const handleCopyText = () => {
@@ -320,39 +373,52 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
           {/* VOICE NOTE MESSAGE */}
           {message.isAudio && (
-            <div className="flex items-center gap-3 py-1 min-w-[210px] sm:min-w-[240px]">
+            <div className="flex items-center gap-3 py-1 min-w-[220px] sm:min-w-[260px] select-none">
               <button
                 onClick={togglePlayAudio}
                 className={`p-2.5 rounded-full flex items-center justify-center transition-all ${
                   isMe ? 'bg-white text-rose-500 hover:bg-white/90 shadow-md' : 'bg-rose-500 text-white hover:bg-rose-600'
                 }`}
+                title={isPlayingAudio ? 'Pause' : 'Play voice note'}
               >
                 {isPlayingAudio ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
               </button>
 
-              <div className="flex-1">
-                {/* Waveform Scrubber */}
-                <div className="flex items-center gap-0.5 h-7">
-                  {(message.audioWaveform || [30, 50, 80, 40, 95, 60, 45, 70, 85, 40, 65, 50, 75, 90, 30]).map((lvl, i) => (
-                    <div
-                      key={i}
-                      className={`w-1 rounded-full transition-all duration-150 ${
-                        isMe
-                          ? (i / 15) * 100 <= audioProgress ? 'bg-white' : 'bg-white/40'
-                          : (i / 15) * 100 <= audioProgress ? 'bg-rose-500' : 'bg-white/20'
-                      }`}
-                      style={{ height: `${Math.max(20, lvl)}%` }}
-                    />
-                  ))}
+              <div className="flex-1 min-w-0">
+                {/* Waveform Scrubber with click-to-seek */}
+                <div 
+                  onClick={handleSeekAudio}
+                  className="flex items-center gap-0.5 h-7 cursor-pointer group/wave hover:opacity-90 py-1"
+                  title="Click to seek"
+                >
+                  {(message.audioWaveform || [30, 50, 80, 40, 95, 60, 45, 70, 85, 40, 65, 50, 75, 90, 30]).map((lvl, i, arr) => {
+                    const barPercent = (i / (arr.length - 1)) * 100;
+                    const isPlayed = barPercent <= audioProgress;
+                    const isCurrent = Math.abs(barPercent - audioProgress) < 100 / arr.length;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-full transition-all duration-100 ${
+                          isMe
+                            ? isPlayed ? 'bg-white' : 'bg-white/40'
+                            : isPlayed ? 'bg-rose-500' : 'bg-white/25'
+                        } ${isCurrent && isPlayingAudio ? 'ring-1 ring-white/60 scale-y-110' : ''}`}
+                        style={{ height: `${Math.max(22, lvl)}%` }}
+                      />
+                    );
+                  })}
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-mono mt-1 opacity-90">
-                  <span>{message.audioDuration || '0:14'}</span>
+                <div className="flex items-center justify-between text-[10px] font-mono mt-0.5 opacity-90">
+                  <span className="font-semibold">
+                    {formatPlaybackTime(currentPlaybackTime, message.audioDuration)}
+                  </span>
                   <button
                     onClick={handleToggleSpeed}
-                    className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] ${
+                    className={`px-1.5 py-0.5 rounded-md font-bold text-[9px] hover:opacity-90 transition-opacity ${
                       isMe ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-300'
                     }`}
+                    title="Change speed"
                   >
                     {audioSpeed}x
                   </button>

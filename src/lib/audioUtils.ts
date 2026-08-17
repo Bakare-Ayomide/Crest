@@ -1,12 +1,12 @@
 // Utility to generate valid WAV audio data and synthesize soft audio tones safely
 
 /**
- * Generates a valid Base64 Data URL for a short PCM WAV audio buffer.
- * Ensures the HTML5 Audio element never encounters 'no supported source found'.
+ * Generates a valid Base64 Data URL for a rich PCM WAV audio buffer with voice formant harmonics.
+ * Ensures the HTML5 Audio element and Web Audio API never encounter decoding errors.
  */
-export function generateValidWavDataUrl(durationSeconds = 2, freq = 440): string {
-  const sampleRate = 8000;
-  const numSamples = Math.floor(sampleRate * durationSeconds);
+export function generateValidWavDataUrl(durationSeconds = 3, baseFreq = 260): string {
+  const sampleRate = 16000;
+  const numSamples = Math.floor(sampleRate * Math.max(1, durationSeconds));
   const headerByteLength = 44;
   const totalByteLength = headerByteLength + numSamples * 2; // 16-bit mono
 
@@ -24,21 +24,29 @@ export function generateValidWavDataUrl(durationSeconds = 2, freq = 440): string
   view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
   view.setUint16(22, 1, true); // NumChannels (1 = Mono)
   view.setUint32(24, sampleRate, true); // SampleRate
-  view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
-  view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
+  view.setUint32(28, sampleRate * 2, true); // ByteRate
+  view.setUint16(32, 2, true); // BlockAlign
   view.setUint16(34, 16, true); // BitsPerSample (16 bits)
 
   // data sub-chunk
   writeString(view, 36, 'data');
   view.setUint32(40, numSamples * 2, true);
 
-  // Write subtle harmonic tone samples
+  // Write subtle harmonic tone samples with warm voice formant frequencies
   let offset = 44;
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
-    // Gentle envelope fade-in and fade-out
-    const env = Math.sin((Math.PI * i) / numSamples);
-    const sample = Math.sin(2 * Math.PI * freq * t) * 0.3 * env;
+    // Gentle speech-like cadence envelope
+    const sentenceEnvelope = Math.sin((Math.PI * i) / numSamples);
+    const wordPacing = 0.5 + 0.5 * Math.sin(2 * Math.PI * 2.5 * t);
+    const pitchVibrato = baseFreq + Math.sin(2 * Math.PI * 4 * t) * 15;
+    
+    // Fundamental + 2nd + 3rd harmonics for warm voice presence
+    const f1 = Math.sin(2 * Math.PI * pitchVibrato * t);
+    const f2 = Math.sin(2 * Math.PI * (pitchVibrato * 2.02) * t) * 0.35;
+    const f3 = Math.sin(2 * Math.PI * (pitchVibrato * 3.01) * t) * 0.15;
+    
+    const sample = (f1 + f2 + f3) * 0.28 * sentenceEnvelope * (0.4 + 0.6 * wordPacing);
     const int16 = Math.max(-32768, Math.min(32767, Math.floor(sample * 32767)));
     view.setInt16(offset, int16, true);
     offset += 2;
@@ -75,7 +83,7 @@ export function isValidAudioUrl(url?: string): boolean {
 }
 
 /**
- * Synthesizes a soft voice note playback using Web Audio API if no audio file is available.
+ * Synthesizes a natural voice note playback using Web Audio API if no audio file is available.
  */
 export class VoiceNoteSynthesizer {
   private ctx: AudioContext | null = null;
@@ -86,35 +94,46 @@ export class VoiceNoteSynthesizer {
   private onProgress?: (percent: number) => void;
   private onEnded?: () => void;
 
-  play(durationSeconds = 3, onProgress?: (percent: number) => void, onEnded?: () => void) {
+  play(durationSeconds = 3, onProgress?: (percent: number) => void, onEnded?: () => void, startOffsetSeconds = 0) {
     this.stop();
     this.duration = Math.max(1, durationSeconds);
     this.onProgress = onProgress;
     this.onEnded = onEnded;
     this.isPlaying = true;
-    this.startTime = Date.now();
+    this.startTime = Date.now() - startOffsetSeconds * 1000;
 
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
         const osc = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
+        const remaining = Math.max(0.1, this.duration - startOffsetSeconds);
+
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(320, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(480, this.ctx.currentTime + this.duration * 0.5);
-        osc.frequency.exponentialRampToValueAtTime(360, this.ctx.currentTime + this.duration);
+        osc.frequency.setValueAtTime(260, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(340, this.ctx.currentTime + remaining * 0.4);
+        osc.frequency.exponentialRampToValueAtTime(280, this.ctx.currentTime + remaining);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(520, this.ctx.currentTime);
+        osc2.frequency.exponentialRampToValueAtTime(680, this.ctx.currentTime + remaining * 0.4);
+        osc2.frequency.exponentialRampToValueAtTime(560, this.ctx.currentTime + remaining);
 
         gain.gain.setValueAtTime(0.01, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.08, this.ctx.currentTime + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + this.duration);
+        gain.gain.linearRampToValueAtTime(0.06, this.ctx.currentTime + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + remaining);
 
         osc.connect(gain);
+        osc2.connect(gain);
         gain.connect(this.ctx.destination);
 
         osc.start();
-        osc.stop(this.ctx.currentTime + this.duration);
+        osc2.start();
+        osc.stop(this.ctx.currentTime + remaining);
+        osc2.stop(this.ctx.currentTime + remaining);
       }
     } catch {
       // AudioContext unavailable, fall back to pure timer

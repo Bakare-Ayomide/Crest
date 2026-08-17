@@ -39,6 +39,7 @@ export const SearchFilterModal: React.FC<SearchFilterModalProps> = ({
   const handleApply = () => {
     triggerHaptic('success');
     onApplyFilters({
+      ...filters,
       maxDistanceKm: distance,
       ageRange: [minAge, maxAge],
       genderPreference: gender,

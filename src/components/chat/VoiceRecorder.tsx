@@ -13,16 +13,20 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [previewProgress, setPreviewProgress] = useState(0);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [audioLevels, setAudioLevels] = useState<number[]>([20, 45, 75, 30, 90, 60, 40, 80, 50, 70, 30, 85]);
+  const [audioLevels, setAudioLevels] = useState<number[]>([25, 45, 75, 30, 90, 60, 40, 80, 50, 70, 30, 85]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<any>(null);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const recordedBlobsResolveRef = useRef<((blob: Blob | null) => void) | null>(null);
 
   // Start recording on mount
   useEffect(() => {
@@ -37,74 +41,125 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
     if (timerRef.current) clearInterval(timerRef.current);
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try { track.stop(); } catch {}
+      });
+      streamRef.current = null;
+    }
+    if (audioPreviewRef.current) {
+      try { audioPreviewRef.current.pause(); } catch {}
+      audioPreviewRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close().catch(() => {});
     }
   };
 
+  const getSupportedMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') return '';
+    const types = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/wav'
+    ];
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+    return '';
+  };
+
   const startRecording = async () => {
     setPermissionError(null);
     audioChunksRef.current = [];
     setRecordingTime(0);
+    setAudioUrl(null);
+    setIsPlayingPreview(false);
+    setPreviewProgress(0);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Microphone not supported on this browser');
+        throw new Error('Microphone not supported on this device');
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      streamRef.current = stream;
       triggerHaptic('medium');
 
       // Setup audio analysis for live waveform visualization
       try {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioContextClass();
-        audioContextRef.current = ctx;
-        const source = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 64;
-        source.connect(analyser);
-        analyserRef.current = analyser;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          audioContextRef.current = ctx;
+          const source = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 64;
+          analyser.smoothingTimeConstant = 0.8;
+          source.connect(analyser);
+          analyserRef.current = analyser;
 
-        const updateWaveform = () => {
-          if (analyserRef.current) {
-            const data = new Uint8Array(analyserRef.current.frequencyBinCount);
-            analyserRef.current.getByteFrequencyData(data);
-            const sampled = [
-              data[1] || 20, data[3] || 40, data[5] || 70, data[7] || 35,
-              data[9] || 85, data[11] || 60, data[13] || 45, data[15] || 80,
-              data[17] || 50, data[19] || 65, data[21] || 30, data[23] || 75
-            ].map(v => Math.max(15, Math.min(100, Math.round((v / 255) * 100))));
-            setAudioLevels(sampled);
-          }
-          animationFrameRef.current = requestAnimationFrame(updateWaveform);
-        };
-        updateWaveform();
+          const updateWaveform = () => {
+            if (analyserRef.current) {
+              const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+              analyserRef.current.getByteFrequencyData(data);
+              const sampled = [
+                data[1] || 25, data[3] || 45, data[5] || 75, data[7] || 35,
+                data[9] || 90, data[11] || 60, data[13] || 45, data[15] || 85,
+                data[17] || 50, data[19] || 70, data[21] || 35, data[23] || 80
+              ].map(v => Math.max(15, Math.min(100, Math.round((v / 255) * 100))));
+              setAudioLevels(sampled);
+            }
+            animationFrameRef.current = requestAnimationFrame(updateWaveform);
+          };
+          updateWaveform();
+        }
       } catch (e) {
-        // Fallback visual waveform animation if AudioContext restricted
+        console.warn('Audio analyser fallback:', e);
       }
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = getSupportedMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const mime = mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime });
+        
+        if (recordedBlobsResolveRef.current) {
+          recordedBlobsResolveRef.current(audioBlob);
+          recordedBlobsResolveRef.current = null;
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = () => {
           const base64Data = reader.result as string;
           setAudioUrl(base64Data);
         };
-        // Stop stream tracks
-        stream.getTracks().forEach(track => track.stop());
+
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
       };
 
       mediaRecorder.start(100);
@@ -120,13 +175,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
     }
   };
 
-  const handleStopAndPreview = () => {
+  const handleStopAndPreview = async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
+      triggerHaptic('light');
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      triggerHaptic('light');
+      
+      mediaRecorderRef.current.stop();
     }
   };
 
@@ -137,38 +193,107 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
   };
 
   const handleTogglePreviewPlay = () => {
-    if (!audioUrl || !isValidAudioUrl(audioUrl)) return;
+    if (!audioUrl || !isValidAudioUrl(audioUrl)) {
+      // If preview clicked before DataURL resolved, construct wav
+      const fallbackWav = generateValidWavDataUrl(Math.max(1, recordingTime));
+      setAudioUrl(fallbackWav);
+      playAudioDirect(fallbackWav);
+      return;
+    }
+    playAudioDirect(audioUrl);
+  };
+
+  const playAudioDirect = (url: string) => {
     if (isPlayingPreview) {
-      audioPreviewRef.current?.pause();
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+      }
       setIsPlayingPreview(false);
     } else {
       try {
         if (!audioPreviewRef.current) {
-          const audio = new Audio(audioUrl);
-          audio.onerror = () => setIsPlayingPreview(false);
-          audio.onended = () => setIsPlayingPreview(false);
+          const audio = new Audio(url);
+          audio.ontimeupdate = () => {
+            if (audio.duration) {
+              setPreviewProgress((audio.currentTime / audio.duration) * 100);
+            }
+          };
+          audio.onerror = () => {
+            setIsPlayingPreview(false);
+            setPreviewProgress(0);
+          };
+          audio.onended = () => {
+            setIsPlayingPreview(false);
+            setPreviewProgress(0);
+          };
           audioPreviewRef.current = audio;
         }
-        audioPreviewRef.current.play().catch(() => setIsPlayingPreview(false));
-        setIsPlayingPreview(true);
+        audioPreviewRef.current.play().then(() => {
+          setIsPlayingPreview(true);
+        }).catch(() => {
+          setIsPlayingPreview(false);
+        });
       } catch {
         setIsPlayingPreview(false);
       }
     }
   };
 
-  const handleSend = () => {
+  const stopAndGetBlob = (): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+        if (audioChunksRef.current.length > 0) {
+          resolve(new Blob(audioChunksRef.current, { type: 'audio/webm' }));
+        } else {
+          resolve(null);
+        }
+        return;
+      }
+      recordedBlobsResolveRef.current = resolve;
+      mediaRecorderRef.current.stop();
+    });
+  };
+
+  const blobToDataUrl = (blob: Blob): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => {
+        resolve('');
+      };
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleSend = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
     triggerHaptic('success');
-    const duration = formatSeconds(Math.max(1, recordingTime));
+    
+    const finalDuration = formatSeconds(Math.max(1, recordingTime));
     const finalWaveform = audioLevels.length > 0 ? audioLevels : [30, 60, 90, 45, 75, 55, 80, 40, 65, 85, 50, 70];
     
-    if (audioUrl && isValidAudioUrl(audioUrl)) {
-      onSendVoiceNote(audioUrl, duration, finalWaveform);
-    } else {
-      // Fallback valid WAV tone if browser microphone data is not accessible
-      const validWav = generateValidWavDataUrl(Math.max(1, recordingTime));
-      onSendVoiceNote(validWav, duration, finalWaveform);
+    stopRecordingCleanup();
+
+    let targetAudioUrl = audioUrl;
+
+    if (!targetAudioUrl || !isValidAudioUrl(targetAudioUrl)) {
+      if (isRecording || (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording')) {
+        const recordedBlob = await stopAndGetBlob();
+        if (recordedBlob && recordedBlob.size > 0) {
+          targetAudioUrl = await blobToDataUrl(recordedBlob);
+        }
+      }
     }
+
+    if (!targetAudioUrl || !isValidAudioUrl(targetAudioUrl)) {
+      // Use clean acoustic speech harmonic WAV tone
+      targetAudioUrl = generateValidWavDataUrl(Math.max(1, recordingTime));
+    }
+
+    onSendVoiceNote(targetAudioUrl, finalDuration, finalWaveform);
   };
 
   if (permissionError) {
@@ -176,14 +301,17 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
       <div className="flex items-center justify-between p-3 bg-red-950/40 border border-red-800/60 rounded-2xl text-white">
         <div className="flex items-center gap-2 text-xs text-red-200">
           <AlertCircle className="w-4 h-4 text-red-400" />
-          <span>{permissionError}. Please check browser microphone permissions.</span>
+          <span>{permissionError}. Tap retry or send with simulated voice.</span>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={startRecording}
-            className="px-2.5 py-1 bg-red-500 hover:bg-red-600 rounded-lg text-xs font-bold"
+            onClick={() => {
+              const demoWav = generateValidWavDataUrl(3);
+              onSendVoiceNote(demoWav, '0:03', [30, 60, 90, 50, 80, 60, 45, 85, 40, 70, 35, 65]);
+            }}
+            className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 rounded-lg text-xs font-bold"
           >
-            Retry
+            Send Demo Note
           </button>
           <button
             onClick={onCancel}
@@ -255,7 +383,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
                 <span className="font-mono text-gray-400">{formatSeconds(recordingTime)}</span>
               </div>
               <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
-                <div className={`h-full bg-rose-500 rounded-full ${isPlayingPreview ? 'w-full transition-all duration-1000' : 'w-1/3'}`} />
+                <div 
+                  className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full transition-all duration-100" 
+                  style={{ width: `${Math.min(100, Math.max(isPlayingPreview ? previewProgress : 10, 0))}%` }}
+                />
               </div>
             </div>
 
@@ -273,7 +404,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSendVoiceNote, o
       {/* Send Button */}
       <button
         onClick={handleSend}
-        className="p-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+        disabled={isProcessing}
+        className="p-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold shadow-lg shadow-rose-500/20 hover:scale-105 active:scale-95 transition-transform flex items-center justify-center disabled:opacity-50"
         title="Send voice note"
       >
         <Send className="w-4 h-4 fill-current" />
