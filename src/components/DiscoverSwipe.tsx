@@ -87,8 +87,8 @@ export const DiscoverSwipe: React.FC<DiscoverSwipeProps> = ({
       {/* TOP HEADER */}
       <div className="flex items-center justify-between pt-1 pb-2">
         {/* Header Title / Brand */}
-        <h1 className="text-2xl font-black tracking-wider bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 bg-clip-text text-transparent font-sans uppercase">
-          CREST
+        <h1 className="font-crest-script text-3xl font-bold crest-gradient-text tracking-normal drop-shadow-sm">
+          Crest
         </h1>
 
         {/* Options Menu Button */}

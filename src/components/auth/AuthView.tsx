@@ -249,11 +249,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-rose-500 via-pink-500 to-amber-400 flex items-center justify-center shadow-lg">
+            <div className="w-8 h-8 rounded-xl crest-gradient-bg flex items-center justify-center shadow-lg shadow-rose-950/60">
               <Flame className="w-4 h-4 text-white fill-white" />
             </div>
-            <span className="text-sm font-black tracking-widest bg-gradient-to-r from-white via-rose-100 to-amber-200 bg-clip-text text-transparent">
-              CREST
+            <span className="font-crest-script text-3xl font-bold crest-gradient-text tracking-normal drop-shadow-md">
+              Crest
             </span>
           </div>
         )}

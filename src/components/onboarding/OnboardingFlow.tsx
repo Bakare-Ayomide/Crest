@@ -244,10 +244,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       gender,
       bio: bio.trim(),
       photos: photos.length > 0 ? photos : CURATED_AVATAR_PRESETS.slice(0, 2),
-      passions: selectedPassions,
+      interests: selectedPassions,
       lookingFor,
-      city: locationName,
-      location: locationName,
+      locationName: locationName,
       verified: true,
       verifiedBadge: true
     };
@@ -300,9 +299,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               <ArrowLeft className="w-4 h-4" />
             </button>
           ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-              <span className="text-[11px] font-black tracking-widest text-white">CREST INTRO</span>
+            <div className="flex items-center gap-2">
+              <span className="font-crest-script text-2xl font-bold crest-gradient-text tracking-normal drop-shadow-md">
+                Crest
+              </span>
             </div>
           )}
 

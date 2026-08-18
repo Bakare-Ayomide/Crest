@@ -39,12 +39,12 @@ export const Header: React.FC<NavigationProps> = ({
           onClick={() => { triggerHaptic('light'); setActiveTab('discover'); }}
           className="flex items-center gap-2 cursor-pointer group"
         >
-          <div>
-            <span className="font-extrabold text-2xl tracking-tight bg-gradient-to-r from-rose-500 via-pink-500 to-amber-400 bg-clip-text text-transparent font-sans">
-              CREST
+          <div className="flex items-center gap-1.5">
+            <span className="font-crest-script text-3xl font-bold crest-gradient-text tracking-normal drop-shadow-sm">
+              Crest
             </span>
             {isGold && (
-              <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-amber-950/80 text-amber-400 rounded-md border border-amber-700 uppercase tracking-wider">
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-amber-950/80 text-amber-400 rounded-md border border-amber-700 uppercase tracking-wider">
                 GOLD
               </span>
             )}
